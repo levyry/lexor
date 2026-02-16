@@ -2,8 +2,11 @@ use crate::lambda_expr::LambdaExpr;
 use chumsky::extra;
 use chumsky::prelude::*;
 
-pub fn parse(input: &str) -> Result<LambdaExpr, Vec<Simple<'_, char>>> {
-    fn parser<'a>() -> impl Parser<'a, &'a str, LambdaExpr, extra::Err<Simple<'a, char>>> {
+///
+/// # Errors
+///
+pub fn parse(input: &str) -> Result<LambdaExpr, Vec<Rich<'_, char>>> {
+    fn parser<'a>() -> impl Parser<'a, &'a str, LambdaExpr, extra::Err<Rich<'a, char>>> {
         recursive(|expr| {
             let var = text::ident()
                 .map(|s: &str| LambdaExpr::Var(s.to_string()))

@@ -1,4 +1,4 @@
 mod de_bruijn;
-mod interpreter;
-mod lambda_expr;
-mod parser;
+pub mod interpreter;
+pub mod lambda_expr;
+pub mod parser;

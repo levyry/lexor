@@ -2,7 +2,7 @@
 
 use crate::de_bruijn::DeBruijn;
 
-trait Interpreter {
+pub trait Interpreter {
     type Term;
 
     fn eval(term: Self::Term) -> Self::Term;

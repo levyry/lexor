@@ -9,8 +9,8 @@ pub enum LambdaExpr {
     App(Box<Self>, Box<Self>),
 }
 impl LambdaExpr {
-    #[allow(unused)]
-    pub(crate) fn pretty_print(self) -> String {
+    #[must_use]
+    pub fn pretty_print(self) -> String {
         match self {
             Var(name) => name,
             Abs(name, lambda_expr) => format!("λ{}.{}", name, lambda_expr.pretty_print()),
@@ -19,33 +19,43 @@ impl LambdaExpr {
     }
 }
 
-impl From<DeBruijn> for LambdaExpr {
-    fn from(db: DeBruijn) -> Self {
-        fn convert(db: DeBruijn, scope: &mut Vec<String>, counter: usize) -> LambdaExpr {
-            match db {
-                DeBruijn::BVar(index) => Var(scope
-                    .iter()
-                    .rev()
-                    .nth(index)
-                    .expect("De Bruijn index out of bounds")
-                    .clone()),
+impl TryFrom<DeBruijn> for LambdaExpr {
+    type Error = String;
 
-                DeBruijn::FVar(name) => LambdaExpr::Var(name),
+    fn try_from(db: DeBruijn) -> Result<Self, Self::Error> {
+        fn convert(
+            db: DeBruijn,
+            scope: &mut Vec<String>,
+            counter: usize,
+        ) -> Result<LambdaExpr, String> {
+            match db {
+                DeBruijn::BVar(index) => {
+                    let name = scope
+                        .iter()
+                        .rev()
+                        .nth(index)
+                        .ok_or_else(|| "De Bruijn index out of bounds".to_string())?
+                        .clone();
+
+                    Ok(Var(name))
+                }
+
+                DeBruijn::FVar(name) => Ok(LambdaExpr::Var(name)),
                 DeBruijn::Abs(body) => {
                     let name = format!("x{counter}");
                     let new_counter = counter.saturating_add(1);
 
                     scope.push(name.clone());
-                    let body_lambda_expr = convert(*body, scope, new_counter);
+                    let body_lambda_expr = convert(*body, scope, new_counter)?;
                     scope.pop();
 
-                    LambdaExpr::Abs(name, Box::new(body_lambda_expr))
+                    Ok(LambdaExpr::Abs(name, Box::new(body_lambda_expr)))
                 }
 
-                DeBruijn::App(lhs, rhs) => LambdaExpr::App(
-                    Box::new(convert(*lhs, scope, counter)),
-                    Box::new(convert(*rhs, scope, counter)),
-                ),
+                DeBruijn::App(lhs, rhs) => Ok(LambdaExpr::App(
+                    Box::new(convert(*lhs, scope, counter)?),
+                    Box::new(convert(*rhs, scope, counter)?),
+                )),
             }
         }
 
@@ -94,37 +104,44 @@ mod tests {
     }
 
     #[test]
+    #[allow(clippy::assertions_on_constants)]
     fn test_from_debruijn_identity() {
         let db = DeBruijn::Abs(Box::new(DeBruijn::BVar(0)));
-        let lambda = LambdaExpr::from(db);
+        let lambda = LambdaExpr::try_from(db);
 
-        if let LambdaExpr::Abs(name, body) = lambda {
-            assert_eq!(name, "x0");
-            assert_eq!(*body, LambdaExpr::Var("x0".to_string()));
-        } else {
-            panic!("Expected Abs");
+        match lambda {
+            Ok(LambdaExpr::Abs(name, body)) => {
+                assert_eq!(name, "x0");
+                assert_eq!(*body, LambdaExpr::Var("x0".to_string()));
+            }
+            _ => assert!(false, "Expected Abs, got {lambda:?}"),
         }
     }
 
     #[test]
+    #[allow(clippy::assertions_on_constants)]
     fn test_from_debruijn_k_combinator() {
         let db = DeBruijn::Abs(Box::new(DeBruijn::Abs(Box::new(DeBruijn::BVar(1)))));
-        let lambda = LambdaExpr::from(db);
-
-        assert_eq!(lambda.pretty_print(), "λx0.λx1.x0");
+        match LambdaExpr::try_from(db) {
+            Ok(lambda) => assert_eq!(lambda.pretty_print(), "λx0.λx1.x0"),
+            Err(err) => assert!(false, "{err:?}"),
+        }
     }
 
     #[test]
+    #[allow(clippy::assertions_on_constants)]
     fn test_from_debruijn_free_vars() {
         let db = DeBruijn::FVar("z".to_string());
-        let lambda = LambdaExpr::from(db);
-        assert_eq!(lambda, LambdaExpr::Var("z".to_string()));
+
+        match LambdaExpr::try_from(db) {
+            Ok(lambda) => assert_eq!(lambda, LambdaExpr::Var("z".to_string())),
+            Err(err) => assert!(false, "{err:?}"),
+        }
     }
 
     #[test]
-    #[should_panic(expected = "De Bruijn index out of bounds")]
     fn test_from_debruijn_out_of_bounds_panic() {
         let db = DeBruijn::BVar(0);
-        let _ = LambdaExpr::from(db);
+        assert!(LambdaExpr::try_from(db).is_err());
     }
 }

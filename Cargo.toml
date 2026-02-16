@@ -3,6 +3,7 @@ resolver = "3"
 members = ["lexor-core"]
 
 [workspace.dependencies]
+chumsky = "0.12"
 lexor-core = { path = "./lexor-core", version = "*" }
 
 [workspace.package]

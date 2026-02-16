@@ -1,0 +1,33 @@
+[workspace]
+resolver = "3"
+members = ["lexor-core"]
+
+[workspace.dependencies]
+lexor-core = { path = "./lexor-core", version = "*" }
+
+[workspace.package]
+version = "0.1.0"
+authors = ["Orbán Levente"]
+description = "SKI and Lambda calculus evaluation and conversion"
+
+[workspace.lints.clippy]
+pedantic = { level = "deny", priority = -1 }
+nursery = { level = "deny", priority = -1 }
+unwrap_used = "deny"
+arithmetic_side_effects = "deny"
+clone_on_ref_ptr = "deny"
+expect_used = "warn"
+todo = "warn"
+panic = "warn"
+module_name_repetitions = "allow"
+assertions_on_constants = "allow"
+
+[workspace.lints.rust]
+unsafe_code = "forbid"
+# TODO: Enable once done with public API
+# missing_docs = "deny"
+
+[profile.release]
+lto = "fat"
+codegen-units = 1
+panic = "abort"

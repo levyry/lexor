@@ -1,3 +1,5 @@
+use std::fmt;
+
 use crate::de_bruijn::DeBruijn;
 
 use LambdaExpr::{Abs, App, Var};
@@ -8,14 +10,18 @@ pub enum LambdaExpr {
     Abs(String, Box<Self>),
     App(Box<Self>, Box<Self>),
 }
-impl LambdaExpr {
-    #[must_use]
-    pub fn pretty_print(self) -> String {
-        match self {
-            Var(name) => name,
-            Abs(name, lambda_expr) => format!("λ{}.{}", name, lambda_expr.pretty_print()),
-            App(lhs, rhs) => format!("({})({})", lhs.pretty_print(), rhs.pretty_print()),
+
+impl fmt::Display for LambdaExpr {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        fn pretty_print(term: &LambdaExpr) -> String {
+            match term {
+                Var(name) => name.clone(),
+                Abs(name, lambda_expr) => format!("λ{}.{}", name, pretty_print(lambda_expr)),
+                App(lhs, rhs) => format!("({})({})", pretty_print(lhs), pretty_print(rhs)),
+            }
         }
+
+        write!(f, "{}", pretty_print(self))
     }
 }
 
@@ -87,24 +93,23 @@ mod tests {
     #[test]
     fn test_print_abs() {
         let expr = abs!("x", var!("x"));
-        assert_eq!(expr.pretty_print(), "λx.x");
+        assert_eq!(expr.to_string(), "λx.x");
     }
 
     #[test]
     fn test_print_app() {
         let expr = app!(var!("a"), var!("b"));
 
-        assert_eq!(expr.pretty_print(), "(a)(b)");
+        assert_eq!(expr.to_string(), "(a)(b)");
     }
 
     #[test]
     fn test_print_complex() {
         let expr = abs!("x", app!(var!("y"), var!("z")));
-        assert_eq!(expr.pretty_print(), "λx.(y)(z)");
+        assert_eq!(expr.to_string(), "λx.(y)(z)");
     }
 
     #[test]
-    #[allow(clippy::assertions_on_constants)]
     fn test_from_debruijn_identity() {
         let db = DeBruijn::Abs(Box::new(DeBruijn::BVar(0)));
         let lambda = LambdaExpr::try_from(db);
@@ -119,17 +124,15 @@ mod tests {
     }
 
     #[test]
-    #[allow(clippy::assertions_on_constants)]
     fn test_from_debruijn_k_combinator() {
         let db = DeBruijn::Abs(Box::new(DeBruijn::Abs(Box::new(DeBruijn::BVar(1)))));
         match LambdaExpr::try_from(db) {
-            Ok(lambda) => assert_eq!(lambda.pretty_print(), "λx0.λx1.x0"),
+            Ok(lambda) => assert_eq!(lambda.to_string(), "λx0.λx1.x0"),
             Err(err) => assert!(false, "{err:?}"),
         }
     }
 
     #[test]
-    #[allow(clippy::assertions_on_constants)]
     fn test_from_debruijn_free_vars() {
         let db = DeBruijn::FVar("z".to_string());
 

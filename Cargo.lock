@@ -86,6 +86,10 @@ dependencies = [
 ]
 
 [[package]]
+name = "lexor-compiler"
+version = "0.1.0"
+
+[[package]]
 name = "lexor-core"
 version = "0.1.0"
 dependencies = [

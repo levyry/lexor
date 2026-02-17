@@ -5,7 +5,10 @@ version.workspace = true
 authors.workspace = true
 description.workspace = true
 
-[dependencies]
-
 [lints]
 workspace = true
+
+[dependencies]
+chumsky = { workspace = true }
+slotmap = { workspace = true }
+

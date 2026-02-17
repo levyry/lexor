@@ -8,6 +8,7 @@ use std::{
 
 mod node;
 mod ski_parser;
+mod arena;
 
 // data Deb = Zero | Succ Deb | Lam Deb | App Deb Deb deriving Show
 #[derive(Debug, Clone)]

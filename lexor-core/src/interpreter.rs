@@ -2,14 +2,14 @@
 
 use crate::de_bruijn::DeBruijn;
 
-pub trait Interpreter {
+pub trait Evaluate {
     type Term;
 
     fn eval(term: Self::Term) -> Self::Term;
 }
 
 pub struct CallByValue;
-impl Interpreter for CallByValue {
+impl Evaluate for CallByValue {
     type Term = DeBruijn;
 
     fn eval(term: Self::Term) -> Self::Term {
@@ -30,7 +30,7 @@ impl Interpreter for CallByValue {
 }
 
 pub struct CallByName;
-impl Interpreter for CallByName {
+impl Evaluate for CallByName {
     type Term = DeBruijn;
 
     fn eval(term: Self::Term) -> Self::Term {
@@ -50,7 +50,7 @@ impl Interpreter for CallByName {
 }
 
 pub struct NormalOrder;
-impl Interpreter for NormalOrder {
+impl Evaluate for NormalOrder {
     type Term = DeBruijn;
 
     fn eval(term: Self::Term) -> Self::Term {

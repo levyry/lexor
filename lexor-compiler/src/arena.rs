@@ -1,3 +1,5 @@
+use std::fmt::Debug;
+
 use slotmap::SlotMap;
 
 use crate::{
@@ -6,7 +8,7 @@ use crate::{
 };
 
 // Abstract away the concrete arena impl
-pub trait Arena {
+pub trait Arena: Default + Debug {
     fn get(&self, key: NodeKey) -> Option<&Node>;
     fn insert(&mut self, value: Node) -> NodeKey;
     fn replace(&mut self, key: NodeKey, replacement: Node);

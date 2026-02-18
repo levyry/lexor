@@ -7,18 +7,28 @@ use crate::{
     ski_parser::CombRec,
 };
 
-#[derive(Debug, Clone, Copy)]
+#[derive(Debug, Clone, Copy, Default)]
 enum ReductionState {
+    #[default]
     Reducible,
     Whnf,
+}
+
+#[derive(Debug, Clone, Copy, Default)]
+enum ReductionMode {
+    #[default]
+    NormalForm,
+    WeakHeadNormalForm,
 }
 
 #[derive(Debug, Clone)]
 struct GraphReductionEngine<Arn: Arena> {
     root: NodeKey,
+    subtree_root: NodeKey,
     spine: Vec<NodeKey>,
     arena: Arn,
     state: ReductionState,
+    mode: ReductionMode,
 }
 
 impl<Arn> GraphReductionEngine<Arn>
@@ -32,17 +42,44 @@ where
 
         Self {
             root,
+            subtree_root: root,
             spine: vec![],
             arena,
-            state: ReductionState::Reducible,
+            state: ReductionState::default(),
+            mode: ReductionMode::default(),
         }
     }
 
-    fn start(&mut self) -> u64 {
+    const fn set_mode(&mut self, new_mode: ReductionMode) {
+        self.mode = new_mode;
+    }
+
+    fn reduce_head_to_whnf(&mut self) -> u64 {
         let mut steps: u64 = 0;
 
         while matches!(self.step(), ReductionState::Reducible) {
             steps = steps.saturating_add(1);
+        }
+
+        steps
+    }
+
+    fn start(&mut self) -> u64 {
+        let mut steps: u64 = self.reduce_head_to_whnf();
+
+        if matches!(self.mode, ReductionMode::NormalForm) {
+            let _head = self.spine.pop();
+
+            while let Some(redex_root) = self.spine.pop()
+                && let Some(Node::App(_lhs, rhs)) = self.arena.get(redex_root)
+            {
+                let old_spine = self.spine.clone();
+                self.spine = vec![];
+                self.subtree_root = *rhs;
+                let extra_steps = self.start();
+                self.spine = old_spine;
+                steps = steps.saturating_add(extra_steps);
+            }
         }
 
         steps
@@ -53,10 +90,11 @@ where
         let current = if let Some(&parent) = self.spine.last() {
             match self.arena.get(parent) {
                 Some(Node::App(lhs, _)) => *lhs,
-                _ => unreachable!(),
+                Some(_) => parent,
+                None => unreachable!(),
             }
         } else {
-            self.root
+            self.subtree_root
         };
 
         self.unwind(current);
@@ -77,7 +115,7 @@ where
                     self.arena.replace(parent_key, Node::App(target, *r));
                 } else {
                     // Empty spine, parent is root
-                    self.root = target;
+                    self.subtree_root = target;
                 }
 
                 current = target;
@@ -105,18 +143,25 @@ where
         };
 
         let Some(redex_root) = self.spine.pop() else {
+            self.spine.push(operator_key);
             return ReductionState::Whnf;
         };
 
         let operator_node = self.arena.get(operator_key);
 
-        match operator_node {
+        let result = match operator_node {
             Some(Node::I) => self.reduce_i(redex_root),
             Some(Node::K) => self.reduce_k(redex_root),
             Some(Node::S) => self.reduce_s(redex_root),
             // TODO: Finish B and C combinators
             _ => ReductionState::Whnf,
+        };
+
+        if matches!(result, ReductionState::Whnf) {
+            self.spine.push(operator_key);
         }
+
+        result
     }
 
     fn reduce_i(&mut self, redex_root: NodeKey) -> ReductionState {
@@ -130,21 +175,36 @@ where
     }
 
     fn reduce_k(&mut self, redex_root: NodeKey) -> ReductionState {
-        if let Some(parent) = self.spine.pop()
-            && let Some(x) = self.arena.get_arg(redex_root)
+        let Some(parent) = self.spine.pop() else {
+            self.spine.push(redex_root);
+            return ReductionState::Whnf;
+        };
+
+        if let Some(x) = self.arena.get_arg(redex_root)
             && let Some(_y) = self.arena.get_arg(parent)
         {
             self.arena.replace(parent, Node::Indirection(x));
             ReductionState::Reducible
         } else {
+            self.spine.push(parent);
+            self.spine.push(redex_root);
             ReductionState::Whnf
         }
     }
 
     fn reduce_s(&mut self, redex_root: NodeKey) -> ReductionState {
-        if let Some(parent) = self.spine.pop()
-            && let Some(grandparent) = self.spine.pop()
-            && let Some(x) = self.arena.get_arg(redex_root)
+        let Some(parent) = self.spine.pop() else {
+            self.spine.push(redex_root);
+            return ReductionState::Whnf;
+        };
+
+        let Some(grandparent) = self.spine.pop() else {
+            self.spine.push(parent);
+            self.spine.push(redex_root);
+            return ReductionState::Whnf;
+        };
+
+        if let Some(x) = self.arena.get_arg(redex_root)
             && let Some(y) = self.arena.get_arg(parent)
             && let Some(z) = self.arena.get_arg(grandparent)
         {
@@ -154,6 +214,9 @@ where
             self.arena.replace(grandparent, Node::App(xz, yz));
             ReductionState::Reducible
         } else {
+            self.spine.push(grandparent);
+            self.spine.push(parent);
+            self.spine.push(redex_root);
             ReductionState::Whnf
         }
     }
@@ -182,7 +245,7 @@ where
                     }
 
                     print_node(arena, *lhs, f, false)?;
-                    write!(f, " ")?;
+                    // write!(f, " ")?;
                     print_node(arena, *rhs, f, true)?;
 
                     if is_rhs_of_app {
@@ -213,11 +276,13 @@ mod tests {
 
     #[test]
     fn check() {
-        let input = "S(KII)";
-        // let input = "SK(KSKIKK(IKSK(KSSKIIKS)SKK)KS)SKSKSK";
+        let input = "S(SSS)S(SS)K";
         let parsed = ski_parser::parse(input).unwrap();
         let mut engine: GraphReductionEngine<SlotMap<NodeKey, Node>> =
             GraphReductionEngine::from_tree(parsed);
+
+        engine.set_mode(ReductionMode::NormalForm);
+        // engine.set_mode(ReductionMode::WeakHeadNormalForm);
 
         println!("Initial: {engine}");
 
@@ -225,6 +290,6 @@ mod tests {
 
         println!("Final ({steps} steps): {engine}");
 
-        // assert_eq!(format!("{engine}"), "S");
+        assert_eq!(format!("{engine}"), "S(K(S(SS)K))(S(K(K(S(SS)K)))(S(SS)K))")
     }
 }

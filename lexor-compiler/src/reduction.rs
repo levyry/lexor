@@ -153,7 +153,8 @@ where
             Some(Node::I) => self.reduce_i(redex_root),
             Some(Node::K) => self.reduce_k(redex_root),
             Some(Node::S) => self.reduce_s(redex_root),
-            // TODO: Finish B and C combinators
+            Some(Node::B) => self.reduce_b(redex_root),
+            Some(Node::C) => self.reduce_c(redex_root),
             _ => ReductionState::Whnf,
         };
 
@@ -217,6 +218,56 @@ where
             self.spine.push(grandparent);
             self.spine.push(parent);
             self.spine.push(redex_root);
+            ReductionState::Whnf
+        }
+    }
+
+    fn reduce_b(&mut self, redex_root: NodeKey) -> ReductionState {
+        let Some(parent) = self.spine.pop() else {
+            return ReductionState::Whnf;
+        };
+
+        let Some(grandparent) = self.spine.pop() else {
+            self.spine.push(parent);
+            return ReductionState::Whnf;
+        };
+
+        if let Some(x) = self.arena.get_arg(redex_root)
+            && let Some(y) = self.arena.get_arg(parent)
+            && let Some(z) = self.arena.get_arg(grandparent)
+        {
+            let yz = self.arena.insert(Node::App(y, z));
+
+            self.arena.replace(grandparent, Node::App(x, yz));
+            ReductionState::Reducible
+        } else {
+            self.spine.push(grandparent);
+            self.spine.push(parent);
+            ReductionState::Whnf
+        }
+    }
+
+    fn reduce_c(&mut self, redex_root: NodeKey) -> ReductionState {
+        let Some(parent) = self.spine.pop() else {
+            return ReductionState::Whnf;
+        };
+
+        let Some(grandparent) = self.spine.pop() else {
+            self.spine.push(parent);
+            return ReductionState::Whnf;
+        };
+
+        if let Some(x) = self.arena.get_arg(redex_root)
+            && let Some(y) = self.arena.get_arg(parent)
+            && let Some(z) = self.arena.get_arg(grandparent)
+        {
+            let xz = self.arena.insert(Node::App(x, z));
+
+            self.arena.replace(grandparent, Node::App(xz, y));
+            ReductionState::Reducible
+        } else {
+            self.spine.push(grandparent);
+            self.spine.push(parent);
             ReductionState::Whnf
         }
     }

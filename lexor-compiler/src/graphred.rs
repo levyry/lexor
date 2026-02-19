@@ -3,7 +3,7 @@ use std::vec;
 
 use crate::{
     arena::Arena,
-    node::{Node, NodeKey},
+    node::{Node, NodeComb, NodeKey},
     ski_parser::CombRec,
 };
 
@@ -105,10 +105,11 @@ where
                     self.spine.push(current);
                     current = *lhs;
                 }
-                Some(_) => {
+                Some(Node::Comb(_)) => {
                     self.spine.push(current);
                     break;
                 }
+                Some(Node::Indirection(_)) => unreachable!("Indirection already resolved"),
                 None => unreachable!("Referenced key not in arena"),
             }
         }
@@ -127,12 +128,18 @@ where
         let operator_node = self.arena.get(operator_key);
 
         let result = match operator_node {
-            Some(Node::I) => self.reduce_i(redex_root),
-            Some(Node::K) => self.reduce_k(redex_root),
-            Some(Node::S) => self.reduce_s(redex_root),
-            Some(Node::B) => self.reduce_b(redex_root),
-            Some(Node::C) => self.reduce_c(redex_root),
-            _ => ReductionState::Whnf,
+            Some(Node::Comb(operator)) => match operator {
+                NodeComb::S => self.reduce_s(redex_root),
+                NodeComb::K => self.reduce_k(redex_root),
+                NodeComb::I => self.reduce_i(redex_root),
+                NodeComb::B => self.reduce_b(redex_root),
+                NodeComb::C => self.reduce_c(redex_root),
+                NodeComb::Sn(_) => todo!(),
+                NodeComb::Bn(_) => todo!(),
+                NodeComb::Cn(_) => todo!(),
+            },
+            Some(x) => unreachable!("Tried reducing something that isn't a comb: {x:?}"),
+            None => unreachable!(),
         };
 
         if matches!(result, ReductionState::Whnf) {
@@ -276,12 +283,9 @@ where
                     }
                     Ok(())
                 }
-                Some(Node::S) => write!(f, "S"),
-                Some(Node::K) => write!(f, "K"),
-                Some(Node::I) => write!(f, "I"),
-                Some(Node::B) => write!(f, "B"),
-                Some(Node::C) => write!(f, "C"),
-                _ => todo!(),
+                Some(Node::Comb(x)) => write!(f, "{x}"),
+                Some(Node::Indirection(_)) => unreachable!("Indirections resolved already"),
+                None => unreachable!("Node not found in arena"),
             }
         }
 

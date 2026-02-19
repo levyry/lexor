@@ -3,7 +3,7 @@ use std::fmt::Debug;
 use slotmap::SlotMap;
 
 use crate::{
-    node::{Node, NodeKey},
+    node::{Node, NodeComb, NodeKey},
     ski_parser::CombRec,
 };
 
@@ -22,11 +22,11 @@ pub trait Arena: Default + Debug {
 
     fn flatten(&mut self, ast: CombRec) -> NodeKey {
         match ast {
-            CombRec::S => self.insert(Node::S),
-            CombRec::K => self.insert(Node::K),
-            CombRec::I => self.insert(Node::I),
-            CombRec::B => self.insert(Node::B),
-            CombRec::C => self.insert(Node::C),
+            CombRec::S => self.insert(Node::Comb(NodeComb::S)),
+            CombRec::K => self.insert(Node::Comb(NodeComb::K)),
+            CombRec::I => self.insert(Node::Comb(NodeComb::I)),
+            CombRec::B => self.insert(Node::Comb(NodeComb::B)),
+            CombRec::C => self.insert(Node::Comb(NodeComb::C)),
             CombRec::App(lhs, rhs) => {
                 let l_key = self.flatten(*lhs);
                 let r_key = self.flatten(*rhs);

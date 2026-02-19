@@ -56,6 +56,13 @@ where
     }
 
     fn start(&mut self) {
+        match self.mode {
+            ReductionMode::NormalForm => self.reduce_to_nf(),
+            ReductionMode::WeakHeadNormalForm => self.reduce_to_whnf(),
+        }
+    }
+
+    fn reduce_to_whnf(&mut self) {
         let mut current_redex_state = ReductionState::Reducable;
 
         while current_redex_state == ReductionState::Reducable {
@@ -73,28 +80,49 @@ where
 
             current_redex_state = self.reduce();
         }
+    }
 
-        if matches!(self.mode, ReductionMode::NormalForm) {
-            let _head = self.spine.pop();
+    fn reduce_to_nf(&mut self) {
+        self.reduce_to_whnf();
 
-            while let Some(&redex_root) = self.spine.last()
-                && let Some(Node::App(_lhs, rhs)) = self.arena.get(redex_root)
-            {
-                // Performance: at this point, self.spine nearly always contains
-                // either one or two `NodeKey`s, so cloning it shouldn't be that
-                // much of a performance hit. juggling with multiple vectors
-                // might actually be slower tbh
-                let old_spine = self.spine.clone();
-                self.spine = vec![];
-                self.subtree_root = *rhs;
+        let _head = self.spine.pop();
 
-                self.start();
-                // steps = steps.saturating_add(extra_steps);
+        while let Some(&redex_root) = self.spine.last()
+            && let Some(Node::App(_lhs, rhs)) = self.arena.get(redex_root)
+        {
+            // Performance: at this point, self.spine nearly always contains
+            // either one or two `NodeKey`s, so cloning it shouldn't be that
+            // much of a performance hit. juggling with multiple vectors
+            // might actually be slower tbh
+            let old_spine = self.spine.clone();
+            self.spine = vec![];
+            self.subtree_root = *rhs;
 
-                self.spine = old_spine;
-                self.spine.pop();
-            }
+            self.start();
+
+            self.spine = old_spine;
+            self.spine.pop();
         }
+    }
+
+    fn resolve_indirection(&mut self, origin: NodeKey) -> NodeKey {
+        let mut current = origin;
+
+        while let Some(&Node::Indirection(target)) = self.arena.get(current) {
+            // Path compression
+            if let Some(&parent_key) = self.spine.last()
+                && let Some(Node::App(_, r)) = self.arena.get(parent_key)
+            {
+                self.arena.replace(parent_key, Node::App(target, *r));
+            } else {
+                // Empty spine, parent is root
+                self.subtree_root = target;
+            }
+
+            current = target;
+        }
+
+        current
     }
 
     fn unwind(&mut self, current: NodeKey) {
@@ -130,12 +158,19 @@ where
         let operator_node = self.arena.get(operator_key);
 
         let result = match operator_node {
-            Some(Node::Comb(operator)) => match operator {
-                NodeComb::S => self.reduce_s(redex_root),
-                NodeComb::K => self.reduce_k(redex_root),
-                NodeComb::I => self.reduce_i(redex_root),
-                NodeComb::B => self.reduce_b(redex_root),
-                NodeComb::C => self.reduce_c(redex_root),
+            Some(&Node::Comb(operator)) => match operator {
+                NodeComb::S | NodeComb::B | NodeComb::C => {
+                    self.reduce_three_args(operator, redex_root)
+                }
+                NodeComb::K => self.reduce_two_args(operator, redex_root),
+                NodeComb::I => {
+                    if let Some(x) = self.arena.get_arg(redex_root) {
+                        self.arena.replace(redex_root, Node::Indirection(x));
+                        ReductionState::Reducable
+                    } else {
+                        ReductionState::Whnf
+                    }
+                }
                 NodeComb::Sn(_) => todo!(),
                 NodeComb::Bn(_) => todo!(),
                 NodeComb::Cn(_) => todo!(),
@@ -152,16 +187,46 @@ where
         result
     }
 
-    fn reduce_i(&mut self, redex_root: NodeKey) -> ReductionState {
-        if let Some(x) = self.arena.get_arg(redex_root) {
-            self.arena.replace(redex_root, Node::Indirection(x));
+    fn reduce_three_args(&mut self, operator: NodeComb, redex_root: NodeKey) -> ReductionState {
+        let Some(parent) = self.spine.pop() else {
+            return ReductionState::Whnf;
+        };
+
+        let Some(grandparent) = self.spine.pop() else {
+            self.spine.push(parent);
+            return ReductionState::Whnf;
+        };
+
+        if let Some(x) = self.arena.get_arg(redex_root)
+            && let Some(y) = self.arena.get_arg(parent)
+            && let Some(z) = self.arena.get_arg(grandparent)
+        {
+            let result = match operator {
+                NodeComb::S => {
+                    let xz = self.arena.insert(Node::App(x, z));
+                    let yz = self.arena.insert(Node::App(y, z));
+                    Node::App(xz, yz)
+                }
+                NodeComb::B => {
+                    let yz = self.arena.insert(Node::App(y, z));
+                    Node::App(x, yz)
+                }
+                NodeComb::C => {
+                    let xz = self.arena.insert(Node::App(x, z));
+                    Node::App(xz, y)
+                }
+                _ => unreachable!("Tried reducing three args on a comb that doesn't take three"),
+            };
+            self.arena.replace(grandparent, result);
             ReductionState::Reducable
         } else {
+            self.spine.push(grandparent);
+            self.spine.push(parent);
             ReductionState::Whnf
         }
     }
 
-    fn reduce_k(&mut self, redex_root: NodeKey) -> ReductionState {
+    fn reduce_two_args(&mut self, operator: NodeComb, redex_root: NodeKey) -> ReductionState {
         let Some(parent) = self.spine.pop() else {
             return ReductionState::Whnf;
         };
@@ -169,108 +234,17 @@ where
         if let Some(x) = self.arena.get_arg(redex_root)
             && let Some(_y) = self.arena.get_arg(parent)
         {
-            self.arena.replace(parent, Node::Indirection(x));
+            let result = match operator {
+                NodeComb::K => Node::Indirection(x),
+                _ => unreachable!("Tried reducing two args on a comb that doesn't take two"),
+            };
+
+            self.arena.replace(parent, result);
             ReductionState::Reducable
         } else {
             self.spine.push(parent);
             ReductionState::Whnf
         }
-    }
-
-    fn reduce_s(&mut self, redex_root: NodeKey) -> ReductionState {
-        let Some(parent) = self.spine.pop() else {
-            return ReductionState::Whnf;
-        };
-
-        let Some(grandparent) = self.spine.pop() else {
-            self.spine.push(parent);
-            return ReductionState::Whnf;
-        };
-
-        if let Some(x) = self.arena.get_arg(redex_root)
-            && let Some(y) = self.arena.get_arg(parent)
-            && let Some(z) = self.arena.get_arg(grandparent)
-        {
-            let xz = self.arena.insert(Node::App(x, z));
-            let yz = self.arena.insert(Node::App(y, z));
-
-            self.arena.replace(grandparent, Node::App(xz, yz));
-            ReductionState::Reducable
-        } else {
-            self.spine.push(grandparent);
-            self.spine.push(parent);
-            ReductionState::Whnf
-        }
-    }
-
-    fn reduce_b(&mut self, redex_root: NodeKey) -> ReductionState {
-        let Some(parent) = self.spine.pop() else {
-            return ReductionState::Whnf;
-        };
-
-        let Some(grandparent) = self.spine.pop() else {
-            self.spine.push(parent);
-            return ReductionState::Whnf;
-        };
-
-        if let Some(x) = self.arena.get_arg(redex_root)
-            && let Some(y) = self.arena.get_arg(parent)
-            && let Some(z) = self.arena.get_arg(grandparent)
-        {
-            let yz = self.arena.insert(Node::App(y, z));
-
-            self.arena.replace(grandparent, Node::App(x, yz));
-            ReductionState::Reducable
-        } else {
-            self.spine.push(grandparent);
-            self.spine.push(parent);
-            ReductionState::Whnf
-        }
-    }
-
-    fn reduce_c(&mut self, redex_root: NodeKey) -> ReductionState {
-        let Some(parent) = self.spine.pop() else {
-            return ReductionState::Whnf;
-        };
-
-        let Some(grandparent) = self.spine.pop() else {
-            self.spine.push(parent);
-            return ReductionState::Whnf;
-        };
-
-        if let Some(x) = self.arena.get_arg(redex_root)
-            && let Some(y) = self.arena.get_arg(parent)
-            && let Some(z) = self.arena.get_arg(grandparent)
-        {
-            let xz = self.arena.insert(Node::App(x, z));
-
-            self.arena.replace(grandparent, Node::App(xz, y));
-            ReductionState::Reducable
-        } else {
-            self.spine.push(grandparent);
-            self.spine.push(parent);
-            ReductionState::Whnf
-        }
-    }
-
-    fn resolve_indirection(&mut self, origin: NodeKey) -> NodeKey {
-        let mut current = origin;
-
-        while let Some(&Node::Indirection(target)) = self.arena.get(current) {
-            // Path compression
-            if let Some(&parent_key) = self.spine.last()
-                && let Some(Node::App(_, r)) = self.arena.get(parent_key)
-            {
-                self.arena.replace(parent_key, Node::App(target, *r));
-            } else {
-                // Empty spine, parent is root
-                self.subtree_root = target;
-            }
-
-            current = target;
-        }
-
-        current
     }
 }
 

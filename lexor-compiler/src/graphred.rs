@@ -109,7 +109,9 @@ where
                     self.spine.push(current);
                     break;
                 }
-                Some(Node::Indirection(_)) => unreachable!("Indirection already resolved"),
+                Some(Node::Indirection(_)) => {
+                    current = self.resolve_indirection(current);
+                }
                 None => unreachable!("Referenced key not in arena"),
             }
         }
@@ -249,6 +251,26 @@ where
             self.spine.push(parent);
             ReductionState::Whnf
         }
+    }
+
+    fn resolve_indirection(&mut self, origin: NodeKey) -> NodeKey {
+        let mut current = origin;
+
+        while let Some(&Node::Indirection(target)) = self.arena.get(current) {
+            // Path compression
+            if let Some(&parent_key) = self.spine.last()
+                && let Some(Node::App(_, r)) = self.arena.get(parent_key)
+            {
+                self.arena.replace(parent_key, Node::App(target, *r));
+            } else {
+                // Empty spine, parent is root
+                self.subtree_root = target;
+            }
+
+            current = target;
+        }
+
+        current
     }
 }
 

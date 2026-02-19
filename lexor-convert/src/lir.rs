@@ -5,4 +5,3 @@ pub enum Lir {
     Lam(Box<Self>),
     App(Box<Self>, Box<Self>),
 }
-

@@ -1,14 +1,18 @@
+#![allow(unused)]
+
 use std::fmt::Debug;
 
 use slotmap::SlotMap;
 
 use crate::{
     node::{Node, NodeComb, NodeKey},
-    ski_parser::CombRec,
+    parser::CombRec,
 };
 
 // Abstract away the concrete arena impl
 pub trait Arena: Default + Debug {
+    fn presized(size: usize) -> Self;
+    fn size(&self) -> usize;
     fn get(&self, key: NodeKey) -> Option<&Node>;
     fn insert(&mut self, value: Node) -> NodeKey;
     fn replace(&mut self, key: NodeKey, replacement: Node);
@@ -37,6 +41,14 @@ pub trait Arena: Default + Debug {
 }
 
 impl Arena for SlotMap<NodeKey, Node> {
+    fn presized(size: usize) -> Self {
+        Self::with_capacity_and_key(size)
+    }
+
+    fn size(&self) -> usize {
+        self.len()
+    }
+
     fn get(&self, key: NodeKey) -> Option<&Node> {
         self.get(key)
     }

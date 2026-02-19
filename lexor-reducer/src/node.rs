@@ -1,3 +1,5 @@
+#![allow(unused)]
+
 use core::fmt;
 
 slotmap::new_key_type! {
@@ -5,7 +7,7 @@ slotmap::new_key_type! {
     pub struct NodeKey;
 }
 
-/// A node in the AST
+/// A node in the flat AST
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub enum Node {
     Comb(NodeComb),

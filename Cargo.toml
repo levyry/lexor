@@ -1,6 +1,6 @@
 [workspace]
 resolver = "3"
-members = ["lexor-compiler", "lexor-core"]
+members = ["lexor-reducer", "lexor-core", "lexor-convert"]
 
 [workspace.dependencies]
 chumsky = "0.12"

@@ -1,14 +1,11 @@
 [package]
-name = "lexor-compiler"
+name = "lexor-convert"
 edition = "2024"
 version.workspace = true
 authors.workspace = true
 description.workspace = true
 
+[dependencies]
+
 [lints]
 workspace = true
-
-[dependencies]
-chumsky = { workspace = true }
-slotmap = { workspace = true }
-

@@ -1,3 +1,5 @@
+#![allow(unused)]
+
 use chumsky::prelude::*;
 
 /// A recursive combinator structure that we parse into. Later, this gets

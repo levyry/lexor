@@ -86,18 +86,22 @@ dependencies = [
 ]
 
 [[package]]
-name = "lexor-compiler"
+name = "lexor-convert"
 version = "0.1.0"
-dependencies = [
- "chumsky",
- "slotmap",
-]
 
 [[package]]
 name = "lexor-core"
 version = "0.1.0"
 dependencies = [
  "chumsky",
+]
+
+[[package]]
+name = "lexor-reducer"
+version = "0.1.0"
+dependencies = [
+ "chumsky",
+ "slotmap",
 ]
 
 [[package]]

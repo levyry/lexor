@@ -7,11 +7,11 @@ slotmap::new_key_type! {
 /// A node in the AST
 #[derive(Debug, Clone)]
 pub enum Node {
-    /// Regular Combinators
+    // Regular Combinators
     S, K, I, B, C,
-    /// Bulk combinators
+    // Bulk combinators
     Sn(u8), Bn(u8), Cn(u8),
-    /// Graph structure
+    // Graph structure
     App(NodeKey, NodeKey),
     Indirection(NodeKey),
 }

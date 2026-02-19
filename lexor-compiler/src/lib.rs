@@ -6,9 +6,13 @@ use std::{
     ops::BitAnd,
 };
 
-mod node;
-mod ski_parser;
 mod arena;
+mod convert;
+mod graphred;
+mod lir;
+mod node;
+mod ski;
+mod ski_parser;
 
 // data Deb = Zero | Succ Deb | Lam Deb | App Deb Deb deriving Show
 #[derive(Debug, Clone)]

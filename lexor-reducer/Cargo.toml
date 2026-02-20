@@ -11,3 +11,10 @@ workspace = true
 [dependencies]
 chumsky = { workspace = true }
 slotmap = { workspace = true }
+
+[dev-dependencies]
+criterion = { version = "0.8", features = ["html_reports"] }
+
+[[bench]]
+name = "reduction_bench"
+harness = false

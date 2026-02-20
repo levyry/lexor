@@ -21,11 +21,11 @@ pub fn parse(input: &str) -> Result<CombRec, Vec<Rich<'_, char>>> {
     fn parser<'a>() -> impl Parser<'a, &'a str, CombRec, extra::Err<Rich<'a, char>>> {
         recursive(|expr| {
             let atom = choice((
-                just('S').to(CombRec::S),
-                just('K').to(CombRec::K),
-                just('I').to(CombRec::I),
-                just('B').to(CombRec::B),
-                just('C').to(CombRec::C),
+                just('S').or(just('s')).to(CombRec::S),
+                just('K').or(just('k')).to(CombRec::K),
+                just('I').or(just('i')).to(CombRec::I),
+                just('B').or(just('b')).to(CombRec::B),
+                just('C').or(just('c')).to(CombRec::C),
                 expr.delimited_by(just('(').or(just('[')), just(')').or(just(']'))),
             ))
             .padded();

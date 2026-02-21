@@ -5,11 +5,10 @@ use lexor_reducer::{NF, ReductionMachine};
 use std::hint::black_box;
 
 fn reduction_benchmark(c: &mut Criterion) {
-    c.bench_function("church 2 16 nf", |b| {
+    c.bench_function("church 2 20", |b| {
         b.iter(|| {
-            let mut engine = ReductionMachine::from_string("((S (S (KS) K) I) ((S (S (KS) K) (S (S (KS) K) (S (S (KS) K) (S (S (KS) K) I)))) (S (S (KS) K) I)))")
-                .set_mode(ReductionMode::NormalForm);
-            engine.start();
+            let mut engine = ReductionMachine::from_string("(S(KS)K(S(S(KS)K)(S(S(KS)K)(S(S(KS)K)I)))(S(S(KS)K)(S(S(KS)K)(S(S(KS)K)(S(S(KS)K)I)))))(S(S(KS)K)I)KI");
+            engine.compute::<NF>();
             black_box(engine)
         });
     });

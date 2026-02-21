@@ -102,35 +102,21 @@ where
     }
 
     fn reduce_to_nf(&mut self) {
-        self.reduce_to_whnf();
+        let mut work_stack = Vec::with_capacity(20);
+        work_stack.push(self.engine.subtree_root);
 
-        let _head = self.engine.spine.pop();
+        while let Some(next_root) = work_stack.pop() {
+            self.engine.subtree_root = next_root;
+            self.engine.spine.clear();
 
-        while let Some(&redex_root) = self.engine.spine.last()
-            && let Some(Node::App(_lhs, rhs)) = self.engine.arena.get(redex_root)
-        {
-            // NOTE: We choose to work with a fresh, empty spine and restoring
-            // the original later. This is probably suboptimal, and using the
-            // original spine could be more performant, but the main issue with
-            // that approach is that we have to keep track of the boundary
-            // between the old and new spines (which might cost more in the
-            // long run).
-            //
-            // For example, the length of the spine might be 4, with 2 of those
-            // terms coming from the current "subspine". At this point, if the
-            // head is an S combinator, it try (and succeed in) popping 3 terms
-            // off the spine, even thought the current subspine only has 2
-            // terms. This is incorrect reduction behavior. Addings checks
-            // everywhere so that we never cross main/sub spine boundaries when
-            // popping arguments might waste more CPU cycles than the current
-            // impl anyway.
-            let old_spine = std::mem::take(&mut self.engine.spine);
-            self.engine.subtree_root = *rhs;
+            self.reduce_to_whnf();
 
-            self.reduce_to_nf();
-
-            self.engine.spine = old_spine;
-            self.engine.spine.pop();
+            let _head = self.engine.spine.pop();
+            for &app_node in &self.engine.spine {
+                if let Some(Node::App(_lhs, rhs)) = self.engine.arena.get(app_node) {
+                    work_stack.push(*rhs);
+                }
+            }
         }
     }
 }

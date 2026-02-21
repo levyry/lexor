@@ -1,4 +1,4 @@
-use lexor_reducer::graphred::GraphReductionEngine;
+use lexor_reducer::graphred::GenericGraphReductionMachine;
 use lexor_reducer::graphred::ReductionMode;
 use slotmap::SlotMap;
 
@@ -7,10 +7,10 @@ fn church_expon() {
     // 2^3 = 8
     let input = "(S (S (KS) K) (S (S (KS) K) (S (S (KS) K) I))) (S (S (KS) K) I)";
     let parsed = lexor_reducer::parse(input).unwrap();
-    let mut engine = GraphReductionEngine::<SlotMap<_, _>>::from_tree(parsed)
+    let mut engine = GenericGraphReductionMachine::<SlotMap<_, _>>::from_tree(parsed)
         .set_mode(ReductionMode::NormalForm);
 
-    engine.start();
+    engine.reduce();
 
     assert_eq!(
         format!("{engine}"),
@@ -22,10 +22,10 @@ fn church_expon() {
 fn normal_form_exhaustion() {
     let input = "S(SKSKSSK)(SSKSKSK)";
     let parsed = lexor_reducer::parse(input).unwrap();
-    let mut engine = GraphReductionEngine::<SlotMap<_, _>>::from_tree(parsed)
+    let mut engine = GenericGraphReductionMachine::<SlotMap<_, _>>::from_tree(parsed)
         .set_mode(ReductionMode::WeakHeadNormalForm);
 
-    engine.start();
+    engine.reduce();
 
     assert_eq!(format!("{engine}"), input);
 }
@@ -34,10 +34,10 @@ fn normal_form_exhaustion() {
 fn ackermann_small() {
     let input = "(S (S (KS) K) (S (S (KS) K) I)) (S (S (KS) K) I) (S (S (KS) K) I)";
     let parsed = lexor_reducer::parse(input).unwrap();
-    let mut engine = GraphReductionEngine::<SlotMap<_, _>>::from_tree(parsed)
+    let mut engine = GenericGraphReductionMachine::<SlotMap<_, _>>::from_tree(parsed)
         .set_mode(ReductionMode::NormalForm);
 
-    engine.start();
+    engine.reduce();
 
     assert_eq!(
         format!("{engine}"),
@@ -49,10 +49,10 @@ fn ackermann_small() {
 fn six_factorial() {
     let input = "(S (S (KS) K) (S (K (S (S (KS) K) (S (S (KS) K) (S (S (KS) K) (S (S (KS) K) (S (S (KS) K) I)))))) (S (S (KS) K) (S (S (KS) K) (S (S (KS) K) (S (S (KS) K) (S (S (KS) K) (S (S (KS) K) I)))))))) (S (K (S (S (KS) K) I)) (S (S (KS) K) (S (S (KS) K) (S (S (KS) K) (S (S (KS) K) (S (S (KS) K) I))))))";
     let parsed = lexor_reducer::parse(input).unwrap();
-    let mut engine: GraphReductionEngine<SlotMap<_, _>> =
-        GraphReductionEngine::from_tree(parsed).set_mode(ReductionMode::NormalForm);
+    let mut engine: GenericGraphReductionMachine<SlotMap<_, _>> =
+        GenericGraphReductionMachine::from_tree(parsed).set_mode(ReductionMode::NormalForm);
 
-    engine.start();
+    engine.reduce();
 
     assert_eq!(
         format!("{engine}"),

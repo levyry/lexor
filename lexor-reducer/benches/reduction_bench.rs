@@ -1,17 +1,13 @@
 use std::hint::black_box;
 
 use criterion::{Criterion, criterion_group, criterion_main};
-use lexor_reducer::{GraphReductionEngine, ReductionMode};
-use slotmap::SlotMap;
+use lexor_reducer::{NF, ReductionMachine};
 use std::hint::black_box;
 
 fn reduction_benchmark(c: &mut Criterion) {
-    let input = "((S (S (KS) K) I) ((S (S (KS) K) (S (S (KS) K) (S (S (KS) K) (S (S (KS) K) I)))) (S (S (KS) K) I)))";
-    let parsed = lexor_reducer::parse(input).unwrap();
-
     c.bench_function("church 2 16 nf", |b| {
         b.iter(|| {
-            let mut engine = GraphReductionEngine::<SlotMap<_, _>>::from_tree(parsed.clone())
+            let mut engine = ReductionMachine::from_string("((S (S (KS) K) I) ((S (S (KS) K) (S (S (KS) K) (S (S (KS) K) (S (S (KS) K) I)))) (S (S (KS) K) I)))")
                 .set_mode(ReductionMode::NormalForm);
             engine.start();
             black_box(engine)

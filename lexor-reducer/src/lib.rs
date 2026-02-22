@@ -1,8 +1,8 @@
-mod arena;
-mod engine;
+//! A crate for efficiently parsing and reducing SKI combinator expressions.
+
+mod core;
 pub mod graphred;
-mod node;
 pub mod parser;
 
 pub use graphred::{ReductionMachine, ReductionMode};
-pub use parser::parse;
+pub use parser::{CombRec, parse};

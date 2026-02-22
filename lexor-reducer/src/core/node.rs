@@ -1,5 +1,3 @@
-#![allow(unused)]
-
 use core::fmt;
 
 slotmap::new_key_type! {

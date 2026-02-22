@@ -1,16 +1,16 @@
 use core::fmt;
 
 use crate::{
-    arena::Arena,
-    node::{Node, NodeComb, NodeKey},
+    core::arena::Arena,
+    core::node::{Node, NodeComb, NodeKey},
     parser::CombRec,
 };
 
 #[derive(Debug, Clone, Copy, Default, PartialEq, Eq)]
 pub enum ReductionState {
     #[default]
-    Reducible,
-    Saturated,
+    Reduced,
+    Halted,
 }
 
 #[derive(Debug, Clone)]
@@ -74,19 +74,21 @@ where
                 Some(Node::Indirection(_)) => {
                     current = self.resolve_indirection(current);
                 }
-                None => unreachable!("Referenced key not in arena"),
+                None => {
+                    unreachable!("Referenced key not in arena");
+                }
             }
         }
     }
 
     pub(crate) fn reduce(&mut self) -> ReductionState {
         let Some(operator_key) = self.spine.pop() else {
-            return ReductionState::Saturated;
+            return ReductionState::Halted;
         };
 
         let Some(redex_root) = self.spine.pop() else {
             self.spine.push(operator_key);
-            return ReductionState::Saturated;
+            return ReductionState::Halted;
         };
 
         let operator_node = self.arena.get(operator_key);
@@ -100,9 +102,9 @@ where
                 NodeComb::I => {
                     if let Some(x) = self.arena.get_arg(redex_root) {
                         self.arena.replace(redex_root, Node::Indirection(x));
-                        ReductionState::Reducible
+                        ReductionState::Reduced
                     } else {
-                        ReductionState::Saturated
+                        ReductionState::Halted
                     }
                 }
                 NodeComb::Sn(_) => todo!(),
@@ -113,7 +115,7 @@ where
             None => unreachable!(),
         };
 
-        if matches!(result, ReductionState::Saturated) {
+        if matches!(result, ReductionState::Halted) {
             self.spine.push(redex_root);
             self.spine.push(operator_key);
         }
@@ -123,12 +125,12 @@ where
 
     fn reduce_three_args(&mut self, operator: NodeComb, redex_root: NodeKey) -> ReductionState {
         let Some(parent) = self.spine.pop() else {
-            return ReductionState::Saturated;
+            return ReductionState::Halted;
         };
 
         let Some(grandparent) = self.spine.pop() else {
             self.spine.push(parent);
-            return ReductionState::Saturated;
+            return ReductionState::Halted;
         };
 
         if let Some(x) = self.arena.get_arg(redex_root)
@@ -152,17 +154,17 @@ where
                 _ => unreachable!("Tried reducing three args on a comb that doesn't take three"),
             };
             self.arena.replace(grandparent, result);
-            ReductionState::Reducible
+            ReductionState::Reduced
         } else {
             self.spine.push(grandparent);
             self.spine.push(parent);
-            ReductionState::Saturated
+            ReductionState::Halted
         }
     }
 
     fn reduce_two_args(&mut self, operator: NodeComb, redex_root: NodeKey) -> ReductionState {
         let Some(parent) = self.spine.pop() else {
-            return ReductionState::Saturated;
+            return ReductionState::Halted;
         };
 
         if let Some(x) = self.arena.get_arg(redex_root)
@@ -172,12 +174,11 @@ where
                 NodeComb::K => Node::Indirection(x),
                 _ => unreachable!("Tried reducing two args on a comb that doesn't take two"),
             };
-
             self.arena.replace(parent, result);
-            ReductionState::Reducible
+            ReductionState::Reduced
         } else {
             self.spine.push(parent);
-            ReductionState::Saturated
+            ReductionState::Halted
         }
     }
 }

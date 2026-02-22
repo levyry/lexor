@@ -1,21 +1,21 @@
 use slotmap::SlotMap;
 
 use crate::{
-    arena::Arena,
-    engine::{Engine, ReductionState},
-    node::{Node, NodeKey},
+    core::arena::Arena,
+    core::engine::{Engine, ReductionState},
+    core::node::{Node, NodeKey},
     parse,
     parser::CombRec,
 };
 
-/// The kind of reduction the reducer can do.
-///
-/// - Weak Head Normal Form: Reduce the terms until the head isn't saturated.
-/// - Normal Form: Always reduces the current leftmost-outermost redex to WHNF.
+/// The kind of reductions the reducer can perform.
 #[derive(Debug, Clone, Copy, Default, PartialEq, Eq)]
 pub enum ReductionMode {
+    /// Always reduces the current leftmost-outermost redex to WHNF until there
+    /// are no more saturated redexes in the whole term.
     #[default]
     NormalForm,
+    /// Reduce the terms until the head of the term isn't saturated.
     WeakHeadNormalForm,
 }
 
@@ -37,7 +37,7 @@ where
         let engine = Engine::from_tree(root);
 
         Self {
-            mode: ReductionMode::default(),
+            mode: ReductionMode::NormalForm,
             engine,
         }
     }
@@ -100,9 +100,9 @@ where
     where
         F: FnMut(&Engine<Arn>),
     {
-        let mut current_redex_state = ReductionState::Reducible;
+        let mut prev_reduction = ReductionState::Reduced;
 
-        while current_redex_state == ReductionState::Reducible {
+        while prev_reduction == ReductionState::Reduced {
             let current = if let Some(&end) = self.engine.spine.last() {
                 match self.engine.arena.get(end) {
                     Some(Node::App(lhs, _)) => *lhs,
@@ -115,9 +115,9 @@ where
 
             self.engine.unwind(current);
 
-            current_redex_state = self.engine.reduce();
+            prev_reduction = self.engine.reduce();
 
-            if current_redex_state == ReductionState::Reducible {
+            if prev_reduction == ReductionState::Reduced {
                 callback(&self.engine);
             }
         }

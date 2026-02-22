@@ -1,11 +1,9 @@
-#![allow(unused)]
-
 use std::fmt::Debug;
 
 use slotmap::SlotMap;
 
 use crate::{
-    node::{Node, NodeComb, NodeKey},
+    core::node::{Node, NodeComb, NodeKey},
     parser::CombRec,
 };
 
@@ -16,6 +14,7 @@ pub trait Arena: Default + Debug {
     fn get(&self, key: NodeKey) -> Option<&Node>;
     fn insert(&mut self, value: Node) -> NodeKey;
     fn replace(&mut self, key: NodeKey, replacement: Node);
+    fn remove(&mut self, key: NodeKey);
 
     fn get_arg(&self, key: NodeKey) -> Option<NodeKey> {
         match self.get(key) {
@@ -61,5 +60,9 @@ impl Arena for SlotMap<NodeKey, Node> {
         if let Some(current) = self.get_mut(key) {
             *current = replacement;
         }
+    }
+
+    fn remove(&mut self, key: NodeKey) {
+        self.remove(key);
     }
 }

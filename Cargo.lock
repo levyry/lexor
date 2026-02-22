@@ -287,6 +287,9 @@ dependencies = [
 [[package]]
 name = "lexor-convert"
 version = "0.1.0"
+dependencies = [
+ "criterion",
+]
 
 [[package]]
 name = "lexor-core"

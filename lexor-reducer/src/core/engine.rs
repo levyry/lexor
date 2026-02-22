@@ -107,9 +107,6 @@ where
                         ReductionState::Halted
                     }
                 }
-                NodeComb::Sn(_) => todo!(),
-                NodeComb::Bn(_) => todo!(),
-                NodeComb::Cn(_) => todo!(),
             },
             Some(x) => unreachable!("Tried reducing something that isn't a comb: {x:?}"),
             None => unreachable!(),

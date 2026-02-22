@@ -1,16 +1,14 @@
 #![allow(unused)]
 
+#![allow(clippy::eq_op)]
+
 use std::{
     cmp::Ordering,
     fmt::{self},
     ops::BitAnd,
+    sync::LazyLock,
 };
 
-mod convert;
-mod lir;
-mod ski;
-
-// data Deb = Zero | Succ Deb | Lam Deb | App Deb Deb deriving Show
 #[derive(Debug, Clone)]
 enum Deb {
     Zero,
@@ -19,9 +17,8 @@ enum Deb {
     App(Box<Self>, Box<Self>),
 }
 
-// data Com = Com :# Com | S | I | C | K | B | Sn Int | Bn Int | Cn Int
 #[derive(Debug, Clone)]
-enum Com {
+pub enum Com {
     App(Box<Self>, Box<Self>),
     S,
     I,
@@ -55,27 +52,25 @@ impl BitAnd for Com {
 //   show (Sn n) = "S_" ++ show n
 impl fmt::Display for Com {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
-        fn pretty_print(body: &Com) -> String {
-            match body {
-                Com::S => String::from("S"),
-                Com::I => String::from("I"),
-                Com::C => String::from("C"),
-                Com::K => String::from("K"),
-                Com::B => String::from("B"),
-                Com::App(lhs, rhs) => {
-                    if let Com::App(_, _) = &**rhs {
-                        format!("{lhs}({rhs})")
-                    } else {
-                        format!("{lhs}{rhs}")
-                    }
+        let result = match self {
+            Self::S => String::from("S"),
+            Self::I => String::from("I"),
+            Self::C => String::from("C"),
+            Self::K => String::from("K"),
+            Self::B => String::from("B"),
+            Self::App(lhs, rhs) => {
+                if let Self::App(_, _) = **rhs {
+                    format!("{lhs}({rhs})")
+                } else {
+                    format!("{lhs}{rhs}")
                 }
-                Com::Sn(n) => format!("S_{n}"),
-                Com::Bn(n) => format!("B_{n}"),
-                Com::Cn(n) => format!("C_{n}"),
             }
-        }
+            Self::Sn(n) => format!("S_{n}"),
+            Self::Bn(n) => format!("B_{n}"),
+            Self::Cn(n) => format!("C_{n}"),
+        };
 
-        write!(f, "{}", pretty_print(self))
+        write!(f, "{result}")
     }
 }
 
@@ -88,48 +83,20 @@ impl fmt::Display for Com {
 //   Lam d | (n, e) <- ski d -> case n of
 //                                0 -> (0,       K :# e)
 //                                _ -> (n - 1,   e)
-fn ski(deb: Deb) -> (usize, Com) {
-    //   where
-    //   f (a, x) (b, y) = case (a, b) of
-    //     (0, 0)             ->         x :# y
-    //     (0, n)             -> Bn n :# x :# y
-    //     (n, 0)             -> Cn n :# x :# y
-    //     (n, m) | n == m    -> Sn n :# x :# y
-    //            | n < m     ->                Bn (m - n) :# (Sn n :# x) :# y
-    //            | otherwise -> Cn (n - m) :# (Bn (n - m) :#  Sn m :# x) :# y
-    fn f(ax: (usize, Com), by: (usize, Com)) -> Com {
-        let (lhs_num, lhs_body) = ax;
-        let (rhs_num, rhs_body) = by;
-
-        match (lhs_num, rhs_num) {
-            (0, 0) => lhs_body & rhs_body,
-            (0, n) => Com::Bn(n) & lhs_body & rhs_body,
-            (n, 0) => Com::Cn(n) & lhs_body & rhs_body,
-            (n, m) => match n.cmp(&m) {
-                Ordering::Equal => Com::Sn(n) & lhs_body & rhs_body,
-                Ordering::Less => Com::Bn(m.saturating_sub(n)) & (Com::Sn(n) & lhs_body) & rhs_body,
-                Ordering::Greater => {
-                    Com::Cn(n.saturating_sub(m))
-                        & (Com::Bn(n.saturating_sub(m)) & Com::Sn(m) & lhs_body)
-                        & rhs_body
-                }
-            },
-        }
-    }
-
+fn convert(deb: Deb) -> (usize, Com) {
     match deb {
         Deb::Zero => (1, Com::I),
         Deb::Succ(body) => {
-            let (n, inner) = ski(*body);
-            (n.saturating_add(1), f((0, Com::K), (n, inner)))
+            let (n, inner) = convert(*body);
+            (n.saturating_add(1), apply((0, Com::K), (n, inner)))
         }
         Deb::App(lhs, rhs) => {
-            let (a, lhs_body) = ski(*lhs);
-            let (b, rhs_body) = ski(*rhs);
-            (usize::max(a, b), f((a, lhs_body), (b, rhs_body)))
+            let (a, lhs_body) = convert(*lhs);
+            let (b, rhs_body) = convert(*rhs);
+            (usize::max(a, b), apply((a, lhs_body), (b, rhs_body)))
         }
         Deb::Lam(body) => {
-            let (n, inner) = ski(*body);
+            let (n, inner) = convert(*body);
             if n == 0 {
                 (0, Com::K & inner)
             } else {
@@ -139,111 +106,152 @@ fn ski(deb: Deb) -> (usize, Com) {
     }
 }
 
-// linBulk :: Com -> Com
-// linBulk b = case b of
-//   Bn n   -> iterate ((B:#        B):#) B !! (n - 1)
-//   Cn n   -> iterate ((B:#(B:#C):#B):#) C !! (n - 1)
-//   Sn n   -> iterate ((B:#(B:#S):#B):#) S !! (n - 1)
-//   x :# y -> linBulk x :# linBulk y
-//   _      -> b
-#[allow(clippy::eq_op)]
-fn lin_bulk(b: Com) -> Com {
-    match b {
-        Com::Bn(n) => {
-            let mut acc = Com::B;
-            for _ in 0..n.saturating_sub(1) {
-                acc = (Com::B & Com::B) & acc;
-            }
-            acc
+fn apply(ax: (usize, Com), by: (usize, Com)) -> Com {
+    let (lhs_num, lhs_body) = ax;
+    let (rhs_num, rhs_body) = by;
+
+    match (lhs_num, rhs_num) {
+        (0, 0) => lhs_body & rhs_body,
+        (0, n) => Com::Bn(n) & lhs_body & rhs_body,
+        (n, 0) => Com::Cn(n) & lhs_body & rhs_body,
+        (n, m) => {
+            let diff = n.abs_diff(m);
+
+            let lhs_part = match n.cmp(&m) {
+                Ordering::Equal => Com::Sn(n) & lhs_body,
+                Ordering::Less => Com::Bn(diff) & (Com::Sn(n) & lhs_body),
+                Ordering::Greater => Com::Cn(diff) & (Com::Bn(diff) & Com::Sn(m) & lhs_body),
+            };
+
+            lhs_part & rhs_body
         }
-        Com::Cn(n) => {
-            let mut acc = Com::C;
-            for _ in 0..n.saturating_sub(1) {
-                acc = (Com::B & (Com::B & Com::C) & Com::B) & acc;
-            }
-            acc
-        }
-        Com::Sn(n) => {
-            let mut acc = Com::S;
-            for _ in 0..n.saturating_sub(1) {
-                acc = (Com::B & (Com::B & Com::S) & Com::B) & acc;
-            }
-            acc
-        }
-        Com::App(lhs, rhs) => lin_bulk(*lhs) & lin_bulk(*rhs),
-        _ => b,
     }
 }
 
-// logBulk :: Com -> Com
-// logBulk b = case b of
-//   Bn n   -> go n (K:#I)         :# B              :# I
-//   Cn n   -> go n (K:#(C:#I:#I)) :# (B:#(B:#C):#B) :# I
-//   Sn n   -> go n (K:#(C:#I:#I)) :# (B:#(B:#S):#B) :# I
-//   x :# y -> logBulk x :# logBulk y
-//   _      -> b
-fn log_bulk(b: Com) -> Com {
-    fn get_bits(mut n: usize) -> Vec<usize> {
-        let mut acc = Vec::new();
-        if n == 0 {
-            return acc;
-        }
-        while n > 0 {
-            let (q, r) = (n / 2, n % 2);
-            acc.push(r);
-            n = q;
-        }
-        acc.reverse();
-        acc
-    }
-
-    fn b0() -> Com {
-        Com::C & Com::B & (Com::S & Com::B & Com::I)
-    }
-
-    #[allow(clippy::eq_op)]
-    fn b1() -> Com {
-        Com::C
-            & (Com::B
-                & Com::S
-                & (Com::B & (Com::B & Com::B) & (Com::C & Com::B & (Com::S & Com::B & Com::I))))
-            & Com::B
-    }
-
-    //   where
-    //   go n base = foldr (:#) base $ ([b0, b1]!!) <$> bits [] n
-    //   bits acc 0 = reverse acc
-    //   bits acc n | (q, r) <- divMod n 2 = bits (r:acc) q
-    //   b0 = C:#B:#(S:#B:#I)
-    //   b1 = C:#(B:#S:#(B:#(B:#B):#(C:#B:#(S:#B:#I)))):#B
-    fn go(n: usize, base: Com) -> Com {
-        let bits = get_bits(n);
-        let mut acc = base;
-
-        for bit in bits.iter().rev() {
-            let op = if *bit == 0 { b0() } else { b1() };
-            acc = op & acc;
-        }
-        acc
-    }
+#[must_use]
+pub fn lin_bulk(b: Com) -> Com {
+    let mut acc: Com;
 
     match b {
-        Com::Bn(n) => go(n, Com::K & Com::I) & Com::B & Com::I,
+        Com::Bn(n) => {
+            acc = Com::B;
+            for _ in 1..n {
+                acc = (Com::B & Com::B) & acc;
+            }
+        }
+        Com::Cn(n) => {
+            acc = Com::C;
+            for _ in 1..n {
+                acc = (Com::B & (Com::B & Com::C) & Com::B) & acc;
+            }
+        }
+        Com::Sn(n) => {
+            acc = Com::S;
+            for _ in 1..n {
+                acc = (Com::B & (Com::B & Com::S) & Com::B) & acc;
+            }
+        }
+        Com::App(lhs, rhs) => return lin_bulk(*lhs) & lin_bulk(*rhs),
+        _ => return b,
+    }
 
+    acc
+}
+
+fn log_bulk(b: Com) -> Com {
+    match b {
+        Com::Bn(n) => go(n, Com::K & Com::I) & Com::B & Com::I,
         Com::Cn(n) => {
             go(n, Com::K & (Com::C & Com::I & Com::I))
                 & (Com::B & (Com::B & Com::C) & Com::B)
                 & Com::I
         }
-
         Com::Sn(n) => {
             go(n, Com::K & (Com::C & Com::I & Com::I))
                 & (Com::B & (Com::B & Com::S) & Com::B)
                 & Com::I
         }
-
         Com::App(lhs, rhs) => log_bulk(*lhs) & log_bulk(*rhs),
-
         _ => b,
+    }
+}
+
+static B0: LazyLock<Com> = LazyLock::new(|| Com::C & Com::B & (Com::S & Com::B & Com::I));
+
+static B1: LazyLock<Com> = LazyLock::new(|| {
+    Com::C
+        & (Com::B
+            & Com::S
+            & (Com::B & (Com::B & Com::B) & (Com::C & Com::B & (Com::S & Com::B & Com::I))))
+        & Com::B
+});
+
+fn go(n: usize, base: Com) -> Com {
+    let num_bits = if n == 0 {
+        0
+    } else {
+        usize::BITS.saturating_sub(n.leading_zeros())
+    };
+
+    (0..num_bits)
+        .map(|i| {
+            if (n >> i) & 1 == 1 {
+                B1.clone()
+            } else {
+                B0.clone()
+            }
+        })
+        .rfold(base, |acc, elem| elem & acc)
+}
+
+#[cfg(test)]
+mod test {
+    use super::*;
+
+    #[test]
+    fn playground() {
+        // \a b c d.d c b a
+        // let lambda_term =
+        // println!("{}", );
+    }
+
+    #[test]
+    fn log_bulk_test() {
+        let x = log_bulk(Com::Sn(1234));
+        let y = log_bulk(Com::Bn(1234));
+
+        assert_eq!(
+            format!("{x}"),
+            "CB(SBI)(C(BS(B(BB)(CB(SBI))))B(CB(SBI)(CB(SBI)(C(BS(B(BB)(CB(SBI))))B(CB(SBI)(C(BS(B(BB)(CB(SBI))))B(C(BS(B(BB)(CB(SBI))))B(CB(SBI)(CB(SBI)(C(BS(B(BB)(CB(SBI))))B(K(CII))))))))))))(B(BS)B)I",
+            "Sn log_bulk failed"
+        );
+        assert_eq!(
+            format!("{y}"),
+            "CB(SBI)(C(BS(B(BB)(CB(SBI))))B(CB(SBI)(CB(SBI)(C(BS(B(BB)(CB(SBI))))B(CB(SBI)(C(BS(B(BB)(CB(SBI))))B(C(BS(B(BB)(CB(SBI))))B(CB(SBI)(CB(SBI)(C(BS(B(BB)(CB(SBI))))B(KI)))))))))))BI",
+            "Bn log_bulk failed"
+        );
+    }
+
+    #[test]
+    fn lin_bulk_test() {
+        let x = lin_bulk(Com::Sn(12));
+        let y = lin_bulk(Com::Bn(11));
+        let z = lin_bulk(Com::Cn(13));
+
+        assert_eq!(
+            format!("{x}"),
+            "B(BS)B(B(BS)B(B(BS)B(B(BS)B(B(BS)B(B(BS)B(B(BS)B(B(BS)B(B(BS)B(B(BS)B(B(BS)BS))))))))))",
+            "Sn lin_bulk failed"
+        );
+        assert_eq!(
+            format!("{y}"),
+            "BB(BB(BB(BB(BB(BB(BB(BB(BB(BBB)))))))))",
+            "Bn lin_bulk failed"
+        );
+        assert_eq!(
+            format!("{z}"),
+            "B(BC)B(B(BC)B(B(BC)B(B(BC)B(B(BC)B(B(BC)B(B(BC)B(B(BC)B(B(BC)B(B(BC)B(B(BC)B(B(BC)BC)))))))))))",
+            "Cn lin_bulk failed"
+        );
     }
 }

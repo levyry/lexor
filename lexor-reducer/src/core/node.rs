@@ -14,13 +14,13 @@ pub enum Node {
     Indirection(NodeKey),
 }
 
-#[rustfmt::skip]
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub enum NodeComb {
-    // Regular Combinators
-    S, K, I, B, C,
-    // Bulk combinators
-    Sn(u8), Bn(u8), Cn(u8),
+    S,
+    K,
+    I,
+    B,
+    C,
 }
 
 impl fmt::Display for NodeComb {
@@ -31,9 +31,6 @@ impl fmt::Display for NodeComb {
             Self::I => write!(f, "I"),
             Self::B => write!(f, "B"),
             Self::C => write!(f, "C"),
-            Self::Sn(n) => write!(f, "S{n}"),
-            Self::Bn(n) => write!(f, "B{n}"),
-            Self::Cn(n) => write!(f, "C{n}"),
         }
     }
 }

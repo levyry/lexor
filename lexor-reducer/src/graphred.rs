@@ -13,6 +13,10 @@ use crate::{
     parser::CombRec,
 };
 
+/// The kind of reduction the reducer can do.
+///
+/// - Weak Head Normal Form: Reduce the terms until the head isn't saturated.
+/// - Normal Form: Always reduces the current leftmost-outermost redex to WHNF.
 #[derive(Debug, Clone, Copy, Default, PartialEq, Eq)]
 pub enum ReductionMode {
     #[default]
@@ -132,11 +136,41 @@ where
 
 // Public facing API
 type ActualArena = SlotMap<NodeKey, Node>;
+
+/// A graph reduction machine capable of reducing SKI combinators.
+///
+/// # Reduction strategies
+///
+/// Currently there are two supported strategies:
+/// - Weak Head Normal Form
+/// - Normal form
+///
+/// More strategies might be added in the future.
+///
+/// # Combinators
+///
+/// Currently, these are the supported combinators and their definitions:
+/// - **S** &nbsp;&nbsp;&nbsp; = &nbsp;&nbsp;&nbsp;`x -> y -> z -> x z(y z)`
+/// - **K** &nbsp;&nbsp;&nbsp; = &nbsp;&nbsp;&nbsp;`x -> y -> x`
+/// - **I** &nbsp;&nbsp;&nbsp; = &nbsp;&nbsp;&nbsp;`x -> x`
+/// - **B** &nbsp;&nbsp;&nbsp; = &nbsp;&nbsp;&nbsp;`x -> y -> z -> x(y z)`
+/// - **C** &nbsp;&nbsp;&nbsp; = &nbsp;&nbsp;&nbsp;`x -> y -> z -> x z y`
+///
 pub struct ReductionMachine {
     inner: GenericGraphReductionMachine<ActualArena>,
 }
 
 impl ReductionMachine {
+    /// Constructs an instance of [`ReductionMachine`] from the recursive, tree
+    /// data structure provided by [`parse`].
+    ///
+    /// # Example
+    ///
+    /// ```
+    /// let input = "SKI";
+    /// let parsed = lexor_reducer::parse(input).unwrap();
+    /// let engine = lexor_reducer::ReductionMachine::from_tree(parsed);
+    /// ```
     #[must_use]
     pub fn from_tree(root: CombRec) -> Self {
         Self {
@@ -144,6 +178,14 @@ impl ReductionMachine {
         }
     }
 
+    /// Construct an instance of [`ReductionMachine`] from a string of SKI
+    /// terms.
+    ///
+    /// # Example
+    ///
+    /// ```
+    /// let engine = lexor_reducer::ReductionMachine::from_string("SKI");
+    /// ```
     #[must_use]
     pub fn from_string(term: &str) -> Self {
         Self {
@@ -151,6 +193,26 @@ impl ReductionMachine {
         }
     }
 
+    /// Sets the [`ReductionMode`] of the machine.
+    ///
+    /// # Example
+    ///
+    /// ```
+    /// use lexor_reducer::{ReductionMachine, ReductionMode};
+    ///
+    /// let nf_result =
+    ///     ReductionMachine::from_string("S(SS)(KK)(II)")
+    ///     .set_mode(ReductionMode::NormalForm)
+    ///     .reduce();
+    ///
+    /// let whnf_result =
+    ///     ReductionMachine::from_string("S(SS)(KK)(II)")
+    ///     .set_mode(ReductionMode::WeakHeadNormalForm)
+    ///     .reduce();
+    ///
+    /// assert_eq!(nf_result, "SKK");
+    /// assert_eq!(whnf_result, "S(KK(II))(II(KK(II)))");
+    /// ```
     #[must_use]
     pub fn set_mode(self, new_mode: ReductionMode) -> Self {
         Self {
@@ -158,10 +220,39 @@ impl ReductionMachine {
         }
     }
 
+    /// Reduces the term loaded into the [`ReductionMachine`] and returns the
+    /// result as a [`String`].
+    ///
+    /// # Example
+    ///
+    /// ```
+    /// use lexor_reducer::ReductionMachine;
+    ///
+    /// let result = ReductionMachine::from_string("SKSKSSKSKSKSKSKSKSK")
+    ///         .reduce();
+    ///
+    /// assert_eq!(result, "K");
+    /// ```
     pub fn reduce(&mut self) -> String {
         self.inner.reduce()
     }
 
+    /// Computes the (weak head) normal form of the term loaded into the
+    /// [`ReductionMachine`] but doesn't return anything. Mainly used for
+    /// benchmarking.
+    ///
+    /// # Example
+    ///
+    /// ```
+    /// use lexor_reducer::ReductionMachine;
+    ///
+    /// let mut machine = ReductionMachine::from_string("KSI");
+    ///
+    /// machine.compute();
+    ///
+    /// // You can still get the result as a String from the Display impl.
+    /// assert_eq!(format!("{}", machine), "S");
+    /// ```
     pub fn compute(&mut self) {
         self.inner.compute();
     }

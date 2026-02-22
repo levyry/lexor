@@ -21,6 +21,8 @@ pub enum DeBruijn {
     App(Box<Self>, Box<Self>),
 }
 
+// TODO: Remove once I figure out if these methods are really needed or not.
+#[allow(dead_code)]
 impl DeBruijn {
     fn var_opening(self, index: usize, name: String) -> Self {
         self.beta_reduce(index, Self::FVar(name))

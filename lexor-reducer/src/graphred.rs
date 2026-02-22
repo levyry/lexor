@@ -1,14 +1,9 @@
-#![allow(unused)]
-
-use core::fmt;
-use std::vec;
-
 use slotmap::SlotMap;
 
 use crate::{
     arena::Arena,
     engine::{Engine, ReductionState},
-    node::{Node, NodeComb, NodeKey},
+    node::{Node, NodeKey},
     parse,
     parser::CombRec,
 };
@@ -65,6 +60,19 @@ where
 
     pub fn reduce(&mut self) -> String {
         self.compute();
+
+        format!("{}", self.engine)
+    }
+
+    pub fn compute(&mut self) {
+        todo!()
+    }
+
+    pub(crate) fn reduce_with<F>(&mut self, callback: F) -> String
+    where
+        F: FnMut(&Engine<Arn>),
+    {
+        self.compute_with(callback);
         // TODO: If the given ski term is sufficiently large, then transforming
         // it into a string might take longer than the reduction itself. A more
         // performant way of providing the result should be implemented. A few
@@ -78,14 +86,20 @@ where
         format!("{}", self.engine)
     }
 
-    pub fn compute(&mut self) {
+    pub(crate) fn compute_with<F>(&mut self, mut callback: F)
+    where
+        F: FnMut(&Engine<Arn>),
+    {
         match self.mode {
-            ReductionMode::NormalForm => self.reduce_to_nf(),
-            ReductionMode::WeakHeadNormalForm => self.reduce_to_whnf(),
+            ReductionMode::NormalForm => self.reduce_to_nf(&mut callback),
+            ReductionMode::WeakHeadNormalForm => self.reduce_to_whnf(&mut callback),
         }
     }
 
-    fn reduce_to_whnf(&mut self) {
+    fn reduce_to_whnf<F>(&mut self, callback: &mut F)
+    where
+        F: FnMut(&Engine<Arn>),
+    {
         let mut current_redex_state = ReductionState::Reducible;
 
         while current_redex_state == ReductionState::Reducible {
@@ -102,10 +116,17 @@ where
             self.engine.unwind(current);
 
             current_redex_state = self.engine.reduce();
+
+            if current_redex_state == ReductionState::Reducible {
+                callback(&self.engine);
+            }
         }
     }
 
-    fn reduce_to_nf(&mut self) {
+    fn reduce_to_nf<F>(&mut self, callback: &mut F)
+    where
+        F: FnMut(&Engine<Arn>),
+    {
         let mut work_stack = Vec::with_capacity(20);
         work_stack.push(self.engine.subtree_root);
 
@@ -113,7 +134,7 @@ where
             self.engine.subtree_root = next_root;
             self.engine.spine.clear();
 
-            self.reduce_to_whnf();
+            self.reduce_to_whnf(callback);
 
             let _head = self.engine.spine.pop();
             for &app_node in &self.engine.spine {
@@ -234,7 +255,49 @@ impl ReductionMachine {
     /// assert_eq!(result, "K");
     /// ```
     pub fn reduce(&mut self) -> String {
-        self.inner.reduce()
+        self.reduce_with(|_| {})
+    }
+
+    /// Reduces the term loaded into the [`ReductionMachine`] and returns the
+    /// result as a [`String`]. Executes `callback` after each reduction step.
+    ///
+    /// The type `Engine` implements the `Display` trait by returning
+    /// the current reduction state. Thus you can view it as an "internal view".
+    ///
+    /// # Example
+    ///
+    /// ```
+    /// use std::vec;
+    /// use lexor_reducer::ReductionMachine;
+    ///
+    /// let mut logs: Vec<String> = vec![];
+    /// let mut count: u32 = 0;
+    ///
+    /// let result =
+    ///         ReductionMachine::from_string("S(SKSKSSK)(SSKSKSK)I")
+    ///             .reduce_with(|view| {
+    ///                 count = count.saturating_add(1);
+    ///                 logs.push(format!("Step #{count}: {view}\n"));
+    ///             });
+    ///
+    /// assert_eq!(result, "SKI");
+    /// assert_eq!(logs.len(), 10);
+    /// assert_eq!(logs[0], "Step #1: SKSKSSKI(SSKSKSKI)\n");
+    /// assert_eq!(logs[1], "Step #2: KK(SK)SSKI(SSKSKSKI)\n");
+    /// assert_eq!(logs[2], "Step #3: KSSKI(SSKSKSKI)\n");
+    /// assert_eq!(logs[3], "Step #4: SKI(SSKSKSKI)\n");
+    /// assert_eq!(logs[4], "Step #5: K(SSKSKSKI)(I(SSKSKSKI))\n");
+    /// assert_eq!(logs[5], "Step #6: SSKSKSKI\n");
+    /// assert_eq!(logs[6], "Step #7: SS(KS)KSKI\n");
+    /// assert_eq!(logs[7], "Step #8: SK(KSK)SKI\n");
+    /// assert_eq!(logs[8], "Step #9: KS(KSKS)KI\n");
+    /// assert_eq!(logs[9], "Step #10: SKI\n");
+    /// ```
+    pub fn reduce_with<F>(&mut self, callback: F) -> String
+    where
+        F: FnMut(&Engine<ActualArena>),
+    {
+        self.inner.reduce_with(callback)
     }
 
     /// Computes the (weak head) normal form of the term loaded into the
@@ -254,10 +317,48 @@ impl ReductionMachine {
     /// assert_eq!(format!("{}", machine), "S");
     /// ```
     pub fn compute(&mut self) {
-        self.inner.compute();
+        self.compute_with(|_| {});
+    }
+
+    /// Computes the (weak head) normal form of the term loaded into the
+    /// [`ReductionMachine`] but doesn't return anything. Executes `callback`
+    /// after each reduction step. Mainly used for benchmarking.
+    ///
+    /// The type `Engine` implements the `Display` trait by returning
+    /// the current reduction state. Thus you can view it as an "internal view".
+    ///
+    /// # Example
+    ///
+    /// ```
+    /// use lexor_reducer::ReductionMachine;
+    ///
+    /// let mut machine = ReductionMachine::from_string("KSI");
+    /// let mut count: u32 = 0;
+    ///
+    /// machine.compute_with(|_| { count = count.saturating_add(1); });
+    ///
+    /// assert_eq!(count, 1);
+    /// assert_eq!(format!("{}", machine), "S");
+    /// ```
+    pub fn compute_with<F>(&mut self, callback: F)
+    where
+        F: FnMut(&Engine<ActualArena>),
+    {
+        self.inner.compute_with(callback);
     }
 }
 
+/// Returns the current reduction state.
+///
+/// # Example
+///
+/// ```
+/// use lexor_reducer::ReductionMachine;
+///
+/// let machine = ReductionMachine::from_string("SKI");
+///
+/// assert_eq!(format!("{machine}"), "SKI");
+/// ```
 impl std::fmt::Display for ReductionMachine {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         write!(f, "{}", self.inner)

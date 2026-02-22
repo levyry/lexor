@@ -1,9 +1,11 @@
 //! A crate for efficiently parsing and reducing SKI combinator expressions.
 
 mod core;
-pub mod graphred;
-pub mod parser;
+mod engineview;
+mod graphred;
+mod parser;
 
+pub use engineview::EngineView;
 pub use graphred::{NF, ReductionStrat, WHNF};
 pub use parser::parse;
 

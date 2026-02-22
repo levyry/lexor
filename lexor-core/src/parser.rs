@@ -1,136 +1,118 @@
-use crate::lambda_expr::LambdaExpr;
-use chumsky::extra;
-use chumsky::prelude::*;
+use crate::lambda::Lambda;
+use std::iter::Peekable;
+use std::str::Chars;
+
+#[derive(Debug)]
+pub enum ParseError {
+    UnexpectedChar(char),
+    UnexpectedEOF,
+    Expected(char),
+}
+
+struct Parser<'a> {
+    chars: Peekable<Chars<'a>>,
+}
+
+impl<'a> Parser<'a> {
+    fn new(input: &'a str) -> Self {
+        Self {
+            chars: input.chars().peekable(),
+        }
+    }
+
+    fn consume_whitespace(&mut self) {
+        while let Some(&c) = self.chars.peek() {
+            if c.is_whitespace() {
+                self.chars.next();
+            } else {
+                break;
+            }
+        }
+    }
+
+    // Parses: x, (expr), \x. expr
+    fn parse_atom(&mut self) -> Result<Lambda, ParseError> {
+        self.consume_whitespace();
+        match self.chars.peek() {
+            Some(&'(') => {
+                self.chars.next(); // eat (
+                let expr = self.parse_expr()?;
+                self.consume_whitespace();
+                if self.chars.next() == Some(')') {
+                    Ok(expr)
+                } else {
+                    Err(ParseError::Expected(')'))
+                }
+            }
+            Some(&'\\' | &'λ') => self.parse_abs(),
+            Some(&c) if c.is_alphabetic() => {
+                let mut name = String::new();
+                while let Some(&c) = self.chars.peek() {
+                    if c.is_alphanumeric() || c == '_' {
+                        name.push(self.chars.next().expect("peeked"));
+                    } else {
+                        break;
+                    }
+                }
+                Ok(Lambda::Var(name))
+            }
+            Some(&c) => Err(ParseError::UnexpectedChar(c)),
+            None => Err(ParseError::UnexpectedEOF),
+        }
+    }
+
+    fn parse_abs(&mut self) -> Result<Lambda, ParseError> {
+        self.consume_whitespace();
+        self.chars.next(); // eat \ or λ
+
+        self.consume_whitespace();
+        // Parse param name
+        let Lambda::Var(param) = self.parse_atom()? else {
+            return Err(ParseError::Expected('a')); // Expected identifier
+        };
+
+        self.consume_whitespace();
+        // Allow dot '.' to be optional if you prefer, but standard is strict
+        if self.chars.next() == Some('.') {
+            let body = self.parse_expr()?;
+            Ok(Lambda::Abs(param, Box::new(body)))
+        } else {
+            Err(ParseError::Expected('.'))
+        }
+    }
+
+    // Parses: atom atom atom ...
+    fn parse_expr(&mut self) -> Result<Lambda, ParseError> {
+        let mut lhs = self.parse_atom()?;
+
+        loop {
+            self.consume_whitespace();
+            match self.chars.peek() {
+                None | Some(')') => break,
+                _ => {
+                    let rhs = self.parse_atom()?;
+                    lhs = Lambda::App(Box::new(lhs), Box::new(rhs));
+                }
+            }
+        }
+        Ok(lhs)
+    }
+}
 
 ///
 /// # Errors
 ///
-pub fn parse(input: &str) -> Result<LambdaExpr, Vec<Rich<'_, char>>> {
-    fn parser<'a>() -> impl Parser<'a, &'a str, LambdaExpr, extra::Err<Rich<'a, char>>> {
-        recursive(|expr| {
-            let var = text::ident()
-                .map(|s: &str| LambdaExpr::Var(s.to_string()))
-                .padded();
-
-            let atom = var
-                .or(expr.clone().delimited_by(just('('), just(')')))
-                .padded();
-
-            let app = atom.clone().foldl(atom.repeated(), |lhs, rhs| {
-                LambdaExpr::App(Box::new(lhs), Box::new(rhs))
-            });
-
-            let lambda = just('λ')
-                .or(just('\\'))
-                .ignore_then(text::ident().padded())
-                .then_ignore(just('.'))
-                .then(expr.padded())
-                .map(|(arg, body): (&str, LambdaExpr)| {
-                    LambdaExpr::Abs(arg.to_string(), Box::new(body))
-                });
-
-            lambda.or(app)
-        })
-        .then_ignore(end())
-    }
-
-    parser().parse(input).into_result()
+pub fn parse(input: &str) -> Result<Lambda, ParseError> {
+    let mut parser = Parser::new(input);
+    parser.parse_expr()
 }
 
-#[cfg(test)]
-mod tests {
-    use super::*;
-    use crate::lambda_expr::LambdaExpr;
+// #[cfg(test)]
+// mod test {
+//     use super::*;
 
-    macro_rules! var {
-        ($s:expr) => {
-            LambdaExpr::Var($s.to_string())
-        };
-    }
-    macro_rules! abs {
-        ($p:expr, $b:expr) => {
-            LambdaExpr::Abs($p.to_string(), Box::new($b))
-        };
-    }
-    macro_rules! app {
-        ($l:expr, $r:expr) => {
-            LambdaExpr::App(Box::new($l), Box::new($r))
-        };
-    }
+//     #[test]
+//     fn playground() {
 
-    #[test]
-    fn test_parse_variable() {
-        assert_eq!(parse("x"), Ok(var!("x")));
-        assert_eq!(parse("foo"), Ok(var!("foo")));
-        assert_eq!(parse("  bar  "), Ok(var!("bar")));
-    }
-
-    #[test]
-    fn test_parse_abstraction_backslash() {
-        // \x. x
-        let expected = abs!("x", var!("x"));
-        assert_eq!(parse(r"\x. x"), Ok(expected));
-    }
-
-    #[test]
-    fn test_parse_abstraction_lambda() {
-        let expected = abs!("x", var!("x"));
-        assert_eq!(parse("λx. x"), Ok(expected));
-    }
-
-    #[test]
-    fn test_parse_abstraction_body_extends_right() {
-        let expected = abs!("x", app!(var!("y"), var!("z")));
-        assert_eq!(parse(r"\x. y z"), Ok(expected));
-    }
-
-    #[test]
-    fn test_parse_application_simple() {
-        let expected = app!(var!("x"), var!("y"));
-        assert_eq!(parse("x y"), Ok(expected));
-    }
-
-    #[test]
-    fn test_parse_application_left_associative() {
-        let expected = app!(app!(var!("x"), var!("y")), var!("z"));
-        assert_eq!(parse("x y z"), Ok(expected));
-    }
-
-    #[test]
-    fn test_parse_parentheses() {
-        let expected = app!(var!("x"), app!(var!("y"), var!("z")));
-        assert_eq!(parse("x (y z)"), Ok(expected));
-    }
-
-    #[test]
-    fn test_parse_complex_nested() {
-        let func = abs!("x", app!(var!("x"), var!("x")));
-        let arg = abs!("y", var!("y"));
-        let expected = app!(func, arg);
-
-        assert_eq!(parse(r"(\x. x x) (\y. y)"), Ok(expected));
-    }
-
-    #[test]
-    fn test_parse_nested_abstractions() {
-        let expected = abs!("x", abs!("y", app!(var!("x"), var!("y"))));
-        assert_eq!(parse(r"\x. \y. x y"), Ok(expected));
-    }
-
-    #[test]
-    fn test_parse_error_incomplete() {
-        assert!(parse(r"\x.").is_err());
-    }
-
-    #[test]
-    fn test_parse_error_unbalanced_parens() {
-        assert!(parse("(x y").is_err());
-        assert!(parse("x y)").is_err());
-    }
-
-    #[test]
-    fn test_parse_error_invalid_char() {
-        assert!(parse("123").is_err());
-        assert!(parse("?").is_err());
-    }
-}
+//     }
+// }

@@ -10,12 +10,11 @@
     - allow "variables" that don't reduce
     - later on allow numbers and strict operators like addition
 
-- lexor-convert
-  - finish conversion
-
 - lexor-core
-  - refactor to be only about lambda calc
-  - revisit reduction implementation
+  - revisit lambda reduction implementation
+  - add eta-optimization to kiselyov
+  - make kiselyov non recursive to avoid stack overflows
+  - use arena allocators for lambda as well
 
 - meta
   - write a pretty todo for main project

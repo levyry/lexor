@@ -1,18 +1,6 @@
 use chumsky::prelude::*;
+use lexor_core::combinator::Combinator;
 
-/// A recursive combinator structure that the parser returns. You can feed this
-/// to [`crate::graphred::ReductionMachine::from_tree`] to initialize a [`crate::graphred::ReductionMachine`].
-#[derive(Debug, Clone)]
-pub enum CombRec {
-    S,
-    K,
-    I,
-    B,
-    C,
-    App(Box<Self>, Box<Self>),
-}
-
-/// Parses a given SKI term into a [`CombRec`]. Returns the root of the AST.
 ///
 /// # Errors
 ///
@@ -22,29 +10,30 @@ pub enum CombRec {
 /// # Example
 ///
 /// ```
-/// use lexor_reducer::{parse, CombRec};
+/// use lexor_reducer::parse;
+/// use lexor_core::combinator::Combinator;
 ///
 /// let ski_term = "IKSKSSKISKSSSIK";
 /// let tree_root = parse(ski_term).unwrap();
 ///
-/// assert!(matches!(tree_root, CombRec::App(_, _)));
+/// assert!(matches!(tree_root, Combinator::App(_, _)));
 /// ```
 ///
-pub fn parse(input: &str) -> Result<CombRec, Vec<Rich<'_, char>>> {
-    fn parser<'a>() -> impl Parser<'a, &'a str, CombRec, extra::Err<Rich<'a, char>>> {
+pub fn parse(input: &str) -> Result<Combinator, Vec<Rich<'_, char>>> {
+    fn parser<'a>() -> impl Parser<'a, &'a str, Combinator, extra::Err<Rich<'a, char>>> {
         recursive(|expr| {
             let atom = choice((
-                just('S').or(just('s')).to(CombRec::S),
-                just('K').or(just('k')).to(CombRec::K),
-                just('I').or(just('i')).to(CombRec::I),
-                just('B').or(just('b')).to(CombRec::B),
-                just('C').or(just('c')).to(CombRec::C),
+                just('S').or(just('s')).to(Combinator::S),
+                just('K').or(just('k')).to(Combinator::K),
+                just('I').or(just('i')).to(Combinator::I),
+                just('B').or(just('b')).to(Combinator::B),
+                just('C').or(just('c')).to(Combinator::C),
                 expr.delimited_by(just('(').or(just('[')), just(')').or(just(']'))),
             ))
             .padded();
 
             atom.clone().foldl(atom.repeated(), |lhs, rhs| {
-                CombRec::App(Box::new(lhs), Box::new(rhs))
+                Combinator::App(Box::new(lhs), Box::new(rhs))
             })
         })
         .then_ignore(end())

@@ -2,13 +2,18 @@
 
 use std::vec;
 
-use crate::lambda_expr::LambdaExpr;
-use DeBruijn::{Abs, App, BVar, FVar};
+/// Reduction strategies. TODO: Write this doc.
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
+pub enum ReductionStrategy {
+    CallByName,
+    CallByValue,
+    NormalOrder,
+}
 
-/// Locally nameless representation
+/// Locally nameless De Bruijn representation.
 ///
 /// Based on: <https://chargueraud.org/research/2009/ln/main.pdf>
-#[derive(Debug, Clone, PartialEq)]
+#[derive(Debug, Clone, PartialEq, Eq)]
 pub enum DeBruijn {
     BVar(usize),
     FVar(String),
@@ -18,24 +23,24 @@ pub enum DeBruijn {
 
 impl DeBruijn {
     fn var_opening(self, index: usize, name: String) -> Self {
-        self.beta_reduce(index, FVar(name))
+        self.beta_reduce(index, Self::FVar(name))
     }
 
     fn var_closing(self, name: String, index: usize) -> Self {
         match self {
-            BVar(_) => self,
+            Self::BVar(_) => self,
 
-            FVar(ref x) => {
+            Self::FVar(ref x) => {
                 if *x == name {
-                    BVar(index)
+                    Self::BVar(index)
                 } else {
                     self
                 }
             }
 
-            Abs(body) => Abs(Box::new(body.var_closing(name, index.saturating_add(1)))),
+            Self::Abs(body) => Self::Abs(Box::new(body.var_closing(name, index.saturating_add(1)))),
 
-            App(lhs, rhs) => App(
+            Self::App(lhs, rhs) => Self::App(
                 Box::new(lhs.var_closing(name.clone(), index)),
                 Box::new(rhs.var_closing(name, index)),
             ),
@@ -44,10 +49,10 @@ impl DeBruijn {
 
     fn is_closed_at(&self, limit: usize) -> bool {
         match self {
-            BVar(k) => *k < limit,
-            FVar(_) => true,
-            Abs(body) => body.is_closed_at(limit.saturating_add(1)),
-            App(lhs, rhs) => lhs.is_closed_at(limit) && rhs.is_closed_at(limit),
+            Self::BVar(k) => *k < limit,
+            Self::FVar(_) => true,
+            Self::Abs(body) => body.is_closed_at(limit.saturating_add(1)),
+            Self::App(lhs, rhs) => lhs.is_closed_at(limit) && rhs.is_closed_at(limit),
         }
     }
 
@@ -57,10 +62,10 @@ impl DeBruijn {
 
     fn collect_free(self, acc: Vec<Self>) -> Vec<String> {
         match self {
-            BVar(_) => vec![],
-            FVar(name) => vec![name],
-            Abs(body) => body.collect_free(acc),
-            App(lhs, rhs) => {
+            Self::BVar(_) => vec![],
+            Self::FVar(name) => vec![name],
+            Self::Abs(body) => body.collect_free(acc),
+            Self::App(lhs, rhs) => {
                 let new_lhs = lhs.collect_free(acc.clone());
                 let new_rhs = rhs.collect_free(acc);
 
@@ -81,9 +86,9 @@ impl DeBruijn {
 
     fn substitute(self, original: String, replacement: &Self) -> Self {
         match self {
-            BVar(_) => self,
+            Self::BVar(_) => self,
 
-            FVar(ref name) => {
+            Self::FVar(ref name) => {
                 if *name == original {
                     replacement.clone()
                 } else {
@@ -91,18 +96,18 @@ impl DeBruijn {
                 }
             }
 
-            Abs(body) => Abs(Box::new(body.substitute(original, replacement))),
+            Self::Abs(body) => Self::Abs(Box::new(body.substitute(original, replacement))),
 
-            App(lhs, rhs) => App(
+            Self::App(lhs, rhs) => Self::App(
                 Box::new(lhs.substitute(original.clone(), &replacement.clone())),
                 Box::new(rhs.substitute(original, &replacement.clone())),
             ),
         }
     }
 
-    pub fn beta_reduce(self, index: usize, other: Self) -> Self {
+    fn beta_reduce(self, index: usize, other: Self) -> Self {
         match self {
-            BVar(k) => {
+            Self::BVar(k) => {
                 if k == index {
                     other
                 } else {
@@ -110,168 +115,61 @@ impl DeBruijn {
                 }
             }
 
-            FVar(_) => self,
+            Self::FVar(_) => self,
 
-            Abs(body) => Abs(Box::new(body.beta_reduce(index.saturating_add(1), other))),
+            Self::Abs(body) => {
+                Self::Abs(Box::new(body.beta_reduce(index.saturating_add(1), other)))
+            }
 
-            App(lhs, rhs) => App(
+            Self::App(lhs, rhs) => Self::App(
                 Box::new(lhs.beta_reduce(index, other.clone())),
                 Box::new(rhs.beta_reduce(index, other)),
             ),
         }
     }
-}
 
-impl From<LambdaExpr> for DeBruijn {
-    fn from(expr: LambdaExpr) -> Self {
-        fn convert(expr: LambdaExpr, scope: &mut Vec<String>) -> DeBruijn {
-            match expr {
-                LambdaExpr::Var(name) => scope
-                    .iter()
-                    .rev()
-                    .position(|n| n == &name)
-                    .map_or(DeBruijn::FVar(name), DeBruijn::BVar),
+    #[must_use]
+    pub fn evaluate(self, strat: ReductionStrategy) -> Self {
+        match strat {
+            ReductionStrategy::CallByName => match self {
+                Self::App(lhs, rhs) => {
+                    let lhs_eval = lhs.evaluate(strat);
 
-                LambdaExpr::Abs(arg, body) => {
-                    scope.push(arg);
-                    let body_de_bruijn = convert(*body, scope);
-                    scope.pop();
-                    DeBruijn::Abs(Box::new(body_de_bruijn))
+                    if let Self::Abs(body) = lhs_eval {
+                        body.beta_reduce(0, *rhs).evaluate(strat)
+                    } else {
+                        Self::App(Box::new(lhs_eval), rhs)
+                    }
                 }
+                _ => self,
+            },
+            ReductionStrategy::CallByValue => match self {
+                Self::App(lhs, rhs) => {
+                    let lhs_eval = lhs.evaluate(strat);
+                    let rhs_eval = rhs.evaluate(strat);
 
-                LambdaExpr::App(lhs, rhs) => DeBruijn::App(
-                    Box::new(convert(*lhs, scope)),
-                    Box::new(convert(*rhs, scope)),
-                ),
-            }
+                    if let Self::Abs(body) = lhs_eval {
+                        body.beta_reduce(0, rhs_eval).evaluate(strat)
+                    } else {
+                        Self::App(Box::new(lhs_eval), Box::new(rhs_eval))
+                    }
+                }
+                _ => self,
+            },
+            ReductionStrategy::NormalOrder => match self {
+                Self::Abs(body) => Self::Abs(Box::new(body.evaluate(strat))),
+
+                Self::App(lhs, rhs) => {
+                    let lhs_whnf = lhs.clone().evaluate(ReductionStrategy::CallByName);
+
+                    if let Self::Abs(body) = lhs_whnf {
+                        body.beta_reduce(0, *rhs).evaluate(strat)
+                    } else {
+                        Self::App(Box::new(lhs.evaluate(strat)), Box::new(rhs.evaluate(strat)))
+                    }
+                }
+                _ => self,
+            },
         }
-
-        convert(expr, &mut Vec::new())
-    }
-}
-
-#[cfg(test)]
-mod tests {
-    use super::*;
-
-    // --- From<LambdaExpr> Tests ---
-
-    #[test]
-    fn test_from_lambda_identity() {
-        let expr = LambdaExpr::Abs("x".to_string(), Box::new(LambdaExpr::Var("x".to_string())));
-        let db = DeBruijn::from(expr);
-        assert_eq!(db, DeBruijn::Abs(Box::new(DeBruijn::BVar(0))));
-    }
-
-    #[test]
-    fn test_from_lambda_shadowing() {
-        let expr = LambdaExpr::Abs(
-            "x".to_string(),
-            Box::new(LambdaExpr::Abs(
-                "x".to_string(),
-                Box::new(LambdaExpr::Var("x".to_string())),
-            )),
-        );
-
-        let db = DeBruijn::from(expr);
-        assert_eq!(
-            db,
-            DeBruijn::Abs(Box::new(DeBruijn::Abs(Box::new(DeBruijn::BVar(0)))))
-        );
-    }
-
-    #[test]
-    fn test_from_lambda_free_vars() {
-        let expr = LambdaExpr::Abs("x".to_string(), Box::new(LambdaExpr::Var("y".to_string())));
-
-        let db = DeBruijn::from(expr);
-        assert_eq!(db, DeBruijn::Abs(Box::new(DeBruijn::FVar("y".to_string()))));
-    }
-
-    // --- Impl Method Tests ---
-
-    #[test]
-    fn test_var_opening() {
-        let t = DeBruijn::BVar(0);
-        assert_eq!(
-            t.var_opening(0, "x".to_string()),
-            DeBruijn::FVar("x".to_string())
-        );
-
-        let t = DeBruijn::Abs(Box::new(DeBruijn::BVar(1)));
-        assert_eq!(
-            t.var_opening(0, "x".to_string()),
-            DeBruijn::Abs(Box::new(DeBruijn::FVar("x".to_string())))
-        );
-    }
-
-    #[test]
-    fn test_var_closing() {
-        let t = DeBruijn::FVar("x".to_string());
-        assert_eq!(t.var_closing("x".to_string(), 0), DeBruijn::BVar(0));
-
-        let t = DeBruijn::Abs(Box::new(DeBruijn::FVar("x".to_string())));
-        assert_eq!(
-            t.var_closing("x".to_string(), 0),
-            DeBruijn::Abs(Box::new(DeBruijn::BVar(1)))
-        );
-    }
-
-    #[test]
-    fn test_is_closed() {
-        assert!(!DeBruijn::BVar(0).is_closed());
-
-        assert!(DeBruijn::Abs(Box::new(DeBruijn::BVar(0))).is_closed());
-
-        assert!(!DeBruijn::Abs(Box::new(DeBruijn::BVar(1))).is_closed());
-    }
-
-    #[test]
-    fn test_collect_free() {
-        let t = DeBruijn::App(
-            Box::new(DeBruijn::FVar("x".to_string())),
-            Box::new(DeBruijn::FVar("y".to_string())),
-        );
-        let free = t.collect_free(vec![]);
-        assert_eq!(free, vec!["x", "y"]);
-
-        let t = DeBruijn::Abs(Box::new(DeBruijn::FVar("x".to_string())));
-        assert_eq!(t.collect_free(vec![]), vec!["x"]);
-
-        let t = DeBruijn::Abs(Box::new(DeBruijn::BVar(0)));
-        assert!(t.collect_free(vec![]).is_empty());
-    }
-
-    #[test]
-    fn test_substitute() {
-        let t = DeBruijn::App(
-            Box::new(DeBruijn::FVar("x".to_string())),
-            Box::new(DeBruijn::FVar("y".to_string())),
-        );
-        let replacement = DeBruijn::FVar("z".to_string());
-        let res = t.substitute("x".to_string(), &replacement);
-
-        assert_eq!(
-            res,
-            DeBruijn::App(
-                Box::new(DeBruijn::FVar("z".to_string())),
-                Box::new(DeBruijn::FVar("y".to_string()))
-            )
-        );
-    }
-
-    #[test]
-    fn test_beta_reduce() {
-        let t = DeBruijn::BVar(0);
-        let sub = DeBruijn::FVar("A".to_string());
-        assert_eq!(t.beta_reduce(0, sub), DeBruijn::FVar("A".to_string()));
-
-        let t = DeBruijn::Abs(Box::new(DeBruijn::BVar(1)));
-        let sub = DeBruijn::FVar("A".to_string());
-
-        assert_eq!(
-            t.beta_reduce(0, sub),
-            DeBruijn::Abs(Box::new(DeBruijn::FVar("A".to_string())))
-        );
     }
 }

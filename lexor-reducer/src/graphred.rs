@@ -1,3 +1,4 @@
+use lexor_core::combinator::Combinator;
 use slotmap::SlotMap;
 
 use crate::{
@@ -5,7 +6,6 @@ use crate::{
     core::engine::{Engine, ReductionState},
     core::node::{Node, NodeKey},
     parse,
-    parser::CombRec,
 };
 
 /// The kind of reductions the reducer can perform.
@@ -33,7 +33,7 @@ where
     Arn: Arena,
 {
     #[must_use]
-    pub fn from_tree(root: CombRec) -> Self {
+    pub(crate) fn from_tree(root: Combinator) -> Self {
         let engine = Engine::from_tree(root);
 
         Self {
@@ -193,7 +193,7 @@ impl ReductionMachine {
     /// let engine = lexor_reducer::ReductionMachine::from_tree(parsed);
     /// ```
     #[must_use]
-    pub fn from_tree(root: CombRec) -> Self {
+    pub fn from_tree(root: Combinator) -> Self {
         Self {
             inner: GenericGraphReductionMachine::from_tree(root),
         }

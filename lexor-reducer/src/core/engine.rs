@@ -1,9 +1,9 @@
 use core::fmt;
+use lexor_core::combinator::Combinator;
 
 use crate::{
     core::arena::Arena,
     core::node::{Node, NodeComb, NodeKey},
-    parser::CombRec,
 };
 
 #[derive(Debug, Clone, Copy, Default, PartialEq, Eq)]
@@ -26,7 +26,7 @@ where
     Arn: Arena,
 {
     #[must_use]
-    pub(crate) fn from_tree(root: CombRec) -> Self {
+    pub(crate) fn from_tree(root: Combinator) -> Self {
         let mut arena = Arn::presized(10_000);
         let root = arena.flatten(root);
 

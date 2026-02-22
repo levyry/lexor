@@ -5,4 +5,4 @@ pub mod graphred;
 pub mod parser;
 
 pub use graphred::{ReductionMachine, ReductionMode};
-pub use parser::{CombRec, parse};
+pub use parser::parse;

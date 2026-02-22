@@ -285,17 +285,11 @@ dependencies = [
 ]
 
 [[package]]
-name = "lexor-convert"
-version = "0.1.0"
-dependencies = [
- "criterion",
-]
-
-[[package]]
 name = "lexor-core"
 version = "0.1.0"
 dependencies = [
  "chumsky",
+ "criterion",
 ]
 
 [[package]]
@@ -304,6 +298,7 @@ version = "0.1.0"
 dependencies = [
  "chumsky",
  "criterion",
+ "lexor-core",
  "slotmap",
 ]
 

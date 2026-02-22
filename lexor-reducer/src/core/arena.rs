@@ -1,11 +1,8 @@
 use std::fmt::Debug;
 
+use crate::core::node::{Node, NodeComb, NodeKey};
+use lexor_core::combinator::Combinator;
 use slotmap::SlotMap;
-
-use crate::{
-    core::node::{Node, NodeComb, NodeKey},
-    parser::CombRec,
-};
 
 // Abstract away the concrete arena impl
 pub trait Arena: Default + Debug {
@@ -23,18 +20,19 @@ pub trait Arena: Default + Debug {
         }
     }
 
-    fn flatten(&mut self, ast: CombRec) -> NodeKey {
+    fn flatten(&mut self, ast: Combinator) -> NodeKey {
         match ast {
-            CombRec::S => self.insert(Node::Comb(NodeComb::S)),
-            CombRec::K => self.insert(Node::Comb(NodeComb::K)),
-            CombRec::I => self.insert(Node::Comb(NodeComb::I)),
-            CombRec::B => self.insert(Node::Comb(NodeComb::B)),
-            CombRec::C => self.insert(Node::Comb(NodeComb::C)),
-            CombRec::App(lhs, rhs) => {
+            Combinator::S => self.insert(Node::Comb(NodeComb::S)),
+            Combinator::K => self.insert(Node::Comb(NodeComb::K)),
+            Combinator::I => self.insert(Node::Comb(NodeComb::I)),
+            Combinator::B => self.insert(Node::Comb(NodeComb::B)),
+            Combinator::C => self.insert(Node::Comb(NodeComb::C)),
+            Combinator::App(lhs, rhs) => {
                 let l_key = self.flatten(*lhs);
                 let r_key = self.flatten(*rhs);
                 self.insert(Node::App(l_key, r_key))
             }
+            Combinator::Var(_) => todo!(),
         }
     }
 }

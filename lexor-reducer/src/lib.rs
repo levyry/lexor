@@ -4,5 +4,14 @@ mod core;
 pub mod graphred;
 pub mod parser;
 
-pub use graphred::{ReductionMachine, ReductionMode};
+pub use graphred::{NF, ReductionStrat, WHNF};
 pub use parser::parse;
+
+mod seal {
+    use crate::graphred;
+
+    /// Seal traits so other crates can't implement anything that is sealed.
+    pub trait Sealed {}
+    impl Sealed for graphred::NormalForm {}
+    impl Sealed for graphred::WeakHeadNormalForm {}
+}

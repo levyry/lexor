@@ -1,10 +1,9 @@
-use lexor_reducer::{ReductionMachine, ReductionMode};
+use lexor_reducer::{NF, ReductionStrat, WHNF};
 
 #[test]
 fn church_expon() {
     // 2^3 = 8
-    let result =
-        ReductionMachine::from_string("(S(S(KS)K)(S(S(KS)K)(S(S(KS)K)I)))(S(S(KS)K)I)").reduce();
+    let result = NF::reduce("(S(S(KS)K)(S(S(KS)K)(S(S(KS)K)I)))(S(S(KS)K)I)");
 
     assert_eq!(
         result,
@@ -14,17 +13,14 @@ fn church_expon() {
 
 #[test]
 fn normal_form_exhaustion() {
-    let result = ReductionMachine::from_string("S(SKSKSSK)(SSKSKSK)")
-        .set_mode(ReductionMode::WeakHeadNormalForm)
-        .reduce();
+    let result = WHNF::reduce("S(SKSKSSK)(SSKSKSK)");
 
     assert_eq!(result, "S(SKSKSSK)(SSKSKSK)");
 }
 
 #[test]
 fn ackermann_small() {
-    let result =
-        ReductionMachine::from_string("(S(S(KS)K)(S(S(KS)K)I))(S(S(KS)K)I)(S(S(KS)K)I)").reduce();
+    let result = NF::reduce("(S(S(KS)K)(S(S(KS)K)I))(S(S(KS)K)I)(S(S(KS)K)I)");
 
     assert_eq!(
         result,
@@ -34,9 +30,9 @@ fn ackermann_small() {
 
 #[test]
 fn six_factorial() {
-    let input = "(S(S(KS)K)(S(K(S(S(KS)K)(S(S(KS)K)(S(S(KS)K)(S(S(KS)K)(S(S(KS)K)I))))))(S(S(KS)K)(S(S(KS)K)(S(S(KS)K)(S(S(KS)K)(S(S(KS)K)(S(S(KS)K)I))))))))(S(K(S(S(KS)K)I))(S(S(KS)K)(S(S(KS)K)(S(S(KS)K)(S(S(KS)K)(S(S(KS)K)I))))))";
-
-    let result = ReductionMachine::from_string(input).reduce();
+    let result = NF::reduce(
+        "(S(S(KS)K)(S(K(S(S(KS)K)(S(S(KS)K)(S(S(KS)K)(S(S(KS)K)(S(S(KS)K)I))))))(S(S(KS)K)(S(S(KS)K)(S(S(KS)K)(S(S(KS)K)(S(S(KS)K)(S(S(KS)K)I))))))))(S(K(S(S(KS)K)I))(S(S(KS)K)(S(S(KS)K)(S(S(KS)K)(S(S(KS)K)(S(S(KS)K)I))))))",
+    );
 
     assert_eq!(
         result,

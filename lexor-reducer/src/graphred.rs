@@ -1,265 +1,50 @@
-use lexor_core::combinator::Combinator;
+use core::{fmt::Debug, hash::Hash};
+
 use slotmap::SlotMap;
 
 use crate::{
-    core::arena::Arena,
-    core::engine::{Engine, ReductionState},
-    core::node::{Node, NodeKey},
+    core::{
+        engine::{Engine, ReductionState},
+        node::{Node, NodeKey},
+    },
     parse,
 };
 
-/// The kind of reductions the reducer can perform.
-#[derive(Debug, Clone, Copy, Default, PartialEq, Eq)]
-pub enum ReductionMode {
-    /// Always reduces the current leftmost-outermost redex to WHNF until there
-    /// are no more saturated redexes in the whole term.
-    #[default]
-    NormalForm,
-    /// Reduce the terms until the head of the term isn't saturated.
-    WeakHeadNormalForm,
-}
+type RealArena = SlotMap<NodeKey, Node>;
 
-#[derive(Debug, Clone)]
-pub struct GenericGraphReductionMachine<Arn>
-where
-    Arn: Arena,
+/// The kind of reductions the [`ReductionMachine`] can perform.
+///
+/// Note that this trait is sealed.
+pub trait ReductionStrat:
+    Clone + Copy + Debug + Default + Eq + Hash + Ord + PartialEq + PartialOrd + super::seal::Sealed
 {
-    mode: ReductionMode,
-    engine: Engine<Arn>,
-}
+    fn perform<F: FnMut(&Engine<RealArena>)>(
+        engine: &mut Engine<RealArena>,
+        callback: &mut Option<F>,
+    );
 
-impl<Arn> GenericGraphReductionMachine<Arn>
-where
-    Arn: Arena,
-{
-    #[must_use]
-    pub(crate) fn from_tree(root: Combinator) -> Self {
-        let engine = Engine::from_tree(root);
-
-        Self {
-            mode: ReductionMode::NormalForm,
-            engine,
-        }
-    }
-
-    #[must_use]
-    ///
-    /// # Panics
-    ///
-    pub fn from_string(term: &str) -> Self {
-        // FIXME: return a result with proper error types later
-        let tree = parse(term).expect("Failed to parse input");
-        Self::from_tree(tree)
-    }
-
-    #[must_use]
-    pub const fn set_mode(mut self, new_mode: ReductionMode) -> Self {
-        self.mode = new_mode;
-        self
-    }
-
-    pub fn reduce(&mut self) -> String {
-        self.compute();
-
-        format!("{}", self.engine)
-    }
-
-    pub fn compute(&mut self) {
-        todo!()
-    }
-
-    pub(crate) fn reduce_with<F>(&mut self, callback: F) -> String
-    where
-        F: FnMut(&Engine<Arn>),
-    {
-        self.compute_with(callback);
-        // TODO: If the given ski term is sufficiently large, then transforming
-        // it into a string might take longer than the reduction itself. A more
-        // performant way of providing the result should be implemented. A few
-        // possible options include:
-        //
-        // 1. Using streams instead of allocating one big String
-        // 2. Finding a good "BigString" crate, or something similar
-        // 3. Only returning the final Arena, and letting the user do whatever
-        // 4. Providing a "view" of the result, or a cursor
-        // 5. Trying to optimize the current Display impl
-        format!("{}", self.engine)
-    }
-
-    pub(crate) fn compute_with<F>(&mut self, mut callback: F)
-    where
-        F: FnMut(&Engine<Arn>),
-    {
-        match self.mode {
-            ReductionMode::NormalForm => self.reduce_to_nf(&mut callback),
-            ReductionMode::WeakHeadNormalForm => self.reduce_to_whnf(&mut callback),
-        }
-    }
-
-    fn reduce_to_whnf<F>(&mut self, callback: &mut F)
-    where
-        F: FnMut(&Engine<Arn>),
-    {
-        let mut prev_reduction = ReductionState::Reduced;
-
-        while prev_reduction == ReductionState::Reduced {
-            let current = if let Some(&end) = self.engine.spine.last() {
-                match self.engine.arena.get(end) {
-                    Some(Node::App(lhs, _)) => *lhs,
-                    Some(_) => end,
-                    None => unreachable!(),
-                }
-            } else {
-                self.engine.subtree_root
-            };
-
-            self.engine.unwind(current);
-
-            prev_reduction = self.engine.reduce();
-
-            if prev_reduction == ReductionState::Reduced {
-                callback(&self.engine);
-            }
-        }
-    }
-
-    fn reduce_to_nf<F>(&mut self, callback: &mut F)
-    where
-        F: FnMut(&Engine<Arn>),
-    {
-        let mut work_stack = Vec::with_capacity(20);
-        work_stack.push(self.engine.subtree_root);
-
-        while let Some(next_root) = work_stack.pop() {
-            self.engine.subtree_root = next_root;
-            self.engine.spine.clear();
-
-            self.reduce_to_whnf(callback);
-
-            let _head = self.engine.spine.pop();
-            for &app_node in &self.engine.spine {
-                if let Some(Node::App(_lhs, rhs)) = self.engine.arena.get(app_node) {
-                    work_stack.push(*rhs);
-                }
-            }
-        }
-    }
-}
-
-impl<Arn> std::fmt::Display for GenericGraphReductionMachine<Arn>
-where
-    Arn: Arena,
-{
-    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-        write!(f, "{}", self.engine)
-    }
-}
-
-// Public facing API
-type ActualArena = SlotMap<NodeKey, Node>;
-
-/// A graph reduction machine capable of reducing SKI combinators.
-///
-/// # Reduction strategies
-///
-/// Currently there are two supported strategies:
-/// - Weak Head Normal Form
-/// - Normal form
-///
-/// More strategies might be added in the future.
-///
-/// # Combinators
-///
-/// Currently, these are the supported combinators and their definitions:
-/// - **S** &nbsp;&nbsp;&nbsp; = &nbsp;&nbsp;&nbsp;`x -> y -> z -> x z(y z)`
-/// - **K** &nbsp;&nbsp;&nbsp; = &nbsp;&nbsp;&nbsp;`x -> y -> x`
-/// - **I** &nbsp;&nbsp;&nbsp; = &nbsp;&nbsp;&nbsp;`x -> x`
-/// - **B** &nbsp;&nbsp;&nbsp; = &nbsp;&nbsp;&nbsp;`x -> y -> z -> x(y z)`
-/// - **C** &nbsp;&nbsp;&nbsp; = &nbsp;&nbsp;&nbsp;`x -> y -> z -> x z y`
-///
-pub struct ReductionMachine {
-    inner: GenericGraphReductionMachine<ActualArena>,
-}
-
-impl ReductionMachine {
-    /// Constructs an instance of [`ReductionMachine`] from the recursive, tree
-    /// data structure provided by [`parse`].
+    /// Reduces the given `input` based on the strategy used to invoke this
+    /// function and returns the result as a [`String`].
     ///
     /// # Example
     ///
     /// ```
-    /// let input = "SKI";
-    /// let parsed = lexor_reducer::parse(input).unwrap();
-    /// let engine = lexor_reducer::ReductionMachine::from_tree(parsed);
-    /// ```
-    #[must_use]
-    pub fn from_tree(root: Combinator) -> Self {
-        Self {
-            inner: GenericGraphReductionMachine::from_tree(root),
-        }
-    }
-
-    /// Construct an instance of [`ReductionMachine`] from a string of SKI
-    /// terms.
+    /// use lexor_reducer::{NF, ReductionStrat};
     ///
-    /// # Example
-    ///
-    /// ```
-    /// let engine = lexor_reducer::ReductionMachine::from_string("SKI");
-    /// ```
-    #[must_use]
-    pub fn from_string(term: &str) -> Self {
-        Self {
-            inner: GenericGraphReductionMachine::from_string(term),
-        }
-    }
-
-    /// Sets the [`ReductionMode`] of the machine.
-    ///
-    /// # Example
-    ///
-    /// ```
-    /// use lexor_reducer::{ReductionMachine, ReductionMode};
-    ///
-    /// let nf_result =
-    ///     ReductionMachine::from_string("S(SS)(KK)(II)")
-    ///     .set_mode(ReductionMode::NormalForm)
-    ///     .reduce();
-    ///
-    /// let whnf_result =
-    ///     ReductionMachine::from_string("S(SS)(KK)(II)")
-    ///     .set_mode(ReductionMode::WeakHeadNormalForm)
-    ///     .reduce();
-    ///
-    /// assert_eq!(nf_result, "SKK");
-    /// assert_eq!(whnf_result, "S(KK(II))(II(KK(II)))");
-    /// ```
-    #[must_use]
-    pub fn set_mode(self, new_mode: ReductionMode) -> Self {
-        Self {
-            inner: self.inner.set_mode(new_mode),
-        }
-    }
-
-    /// Reduces the term loaded into the [`ReductionMachine`] and returns the
-    /// result as a [`String`].
-    ///
-    /// # Example
-    ///
-    /// ```
-    /// use lexor_reducer::ReductionMachine;
-    ///
-    /// let result = ReductionMachine::from_string("SKSKSSKSKSKSKSKSKSK")
-    ///         .reduce();
+    /// let result = NF::reduce("SKSKSSKSKSKSKSKSKSK");
     ///
     /// assert_eq!(result, "K");
     /// ```
-    pub fn reduce(&mut self) -> String {
-        self.reduce_with(|_| {})
+    fn reduce(input: &str) -> String {
+        let root = parse(input).expect("Invalid input");
+        let mut engine = Engine::from_tree(root);
+        Self::perform::<fn(&Engine<RealArena>)>(&mut engine, &mut None);
+        format!("{engine}")
     }
 
-    /// Reduces the term loaded into the [`ReductionMachine`] and returns the
-    /// result as a [`String`]. Executes `callback` after each reduction step.
+    /// Reduces the given `input` based on the strategy ued to invoke this
+    /// function and returns the result as a [`String`]. Executes `callback`
+    /// after each reduction step.
     ///
     /// The type `Engine` implements the `Display` trait by returning
     /// the current reduction state. Thus you can view it as an "internal view".
@@ -268,17 +53,15 @@ impl ReductionMachine {
     ///
     /// ```
     /// use std::vec;
-    /// use lexor_reducer::ReductionMachine;
+    /// use lexor_reducer::{NF, ReductionStrat};
     ///
     /// let mut logs: Vec<String> = vec![];
     /// let mut count: u32 = 0;
     ///
-    /// let result =
-    ///         ReductionMachine::from_string("S(SKSKSSK)(SSKSKSK)I")
-    ///             .reduce_with(|view| {
-    ///                 count = count.saturating_add(1);
-    ///                 logs.push(format!("Step #{count}: {view}\n"));
-    ///             });
+    /// let result = NF::reduce_with("S(SKSKSSK)(SSKSKSK)I", |view| {
+    ///                  count = count.saturating_add(1);
+    ///                  logs.push(format!("Step #{count}: {view}\n"));
+    ///              });
     ///
     /// assert_eq!(result, "SKI");
     /// assert_eq!(logs.len(), 10);
@@ -293,36 +76,31 @@ impl ReductionMachine {
     /// assert_eq!(logs[8], "Step #9: KS(KSKS)KI\n");
     /// assert_eq!(logs[9], "Step #10: SKI\n");
     /// ```
-    pub fn reduce_with<F>(&mut self, callback: F) -> String
-    where
-        F: FnMut(&Engine<ActualArena>),
-    {
-        self.inner.reduce_with(callback)
+    fn reduce_with<F: FnMut(&Engine<RealArena>)>(input: &str, callback: F) -> String {
+        let root = parse(input).expect("Invalid input");
+        let mut engine = Engine::from_tree(root);
+        Self::perform::<F>(&mut engine, &mut Some(callback));
+        format!("{engine}")
     }
 
-    /// Computes the (weak head) normal form of the term loaded into the
-    /// [`ReductionMachine`] but doesn't return anything. Mainly used for
-    /// benchmarking.
+    /// Computes the desired form of the given `input`.
     ///
     /// # Example
     ///
     /// ```
-    /// use lexor_reducer::ReductionMachine;
+    /// use lexor_reducer::{NF, ReductionStrat};
     ///
-    /// let mut machine = ReductionMachine::from_string("KSI");
-    ///
-    /// machine.compute();
-    ///
-    /// // You can still get the result as a String from the Display impl.
-    /// assert_eq!(format!("{}", machine), "S");
+    /// // Internally, this reduces to "S"
+    /// NF::compute("KSI");
     /// ```
-    pub fn compute(&mut self) {
-        self.compute_with(|_| {});
+    fn compute(input: &str) {
+        let root = parse(input).expect("Invalid input");
+        let mut engine = Engine::from_tree(root);
+        Self::perform::<fn(&Engine<RealArena>)>(&mut engine, &mut None);
     }
 
-    /// Computes the (weak head) normal form of the term loaded into the
-    /// [`ReductionMachine`] but doesn't return anything. Executes `callback`
-    /// after each reduction step. Mainly used for benchmarking.
+    /// Computes the desired form of the given `input`. Executes `callback`
+    /// after each reduction step.
     ///
     /// The type `Engine` implements the `Display` trait by returning
     /// the current reduction state. Thus you can view it as an "internal view".
@@ -330,37 +108,101 @@ impl ReductionMachine {
     /// # Example
     ///
     /// ```
-    /// use lexor_reducer::ReductionMachine;
+    /// use lexor_reducer::{NF, ReductionStrat};
     ///
-    /// let mut machine = ReductionMachine::from_string("KSI");
     /// let mut count: u32 = 0;
     ///
-    /// machine.compute_with(|_| { count = count.saturating_add(1); });
+    /// NF::compute_with("KSI", |_| { count = count.saturating_add(1); });
     ///
     /// assert_eq!(count, 1);
-    /// assert_eq!(format!("{}", machine), "S");
     /// ```
-    pub fn compute_with<F>(&mut self, callback: F)
-    where
-        F: FnMut(&Engine<ActualArena>),
-    {
-        self.inner.compute_with(callback);
+    fn compute_with<F: FnMut(&Engine<RealArena>)>(input: &str, callback: F) {
+        let root = parse(input).expect("Invalid input");
+        let mut engine = Engine::from_tree(root);
+        Self::perform::<F>(&mut engine, &mut Some(callback));
     }
 }
 
-/// Returns the current reduction state.
-///
-/// # Example
-///
-/// ```
-/// use lexor_reducer::ReductionMachine;
-///
-/// let machine = ReductionMachine::from_string("SKI");
-///
-/// assert_eq!(format!("{machine}"), "SKI");
-/// ```
-impl std::fmt::Display for ReductionMachine {
-    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-        write!(f, "{}", self.inner)
+/// [Normal form] reduction strategy. Always reduces the current
+/// leftmost-outermost redex to [`WeakHeadNormalForm`] until there are no more
+/// saturated redexes in the whole term.
+#[derive(Clone, Copy, Debug, Eq, Hash, Ord, PartialEq, PartialOrd)]
+pub enum NormalForm {}
+
+impl Default for NormalForm {
+    fn default() -> Self {
+        unreachable!("NormalForm default")
+    }
+}
+
+/// A type alias for [`NormalForm`].
+pub type NF = NormalForm;
+
+impl ReductionStrat for NormalForm {
+    fn perform<F>(engine: &mut Engine<RealArena>, callback: &mut Option<F>)
+    where
+        F: FnMut(&Engine<RealArena>),
+    {
+        let mut work_stack = Vec::with_capacity(20);
+        work_stack.push(engine.subtree_root);
+
+        while let Some(next_root) = work_stack.pop() {
+            engine.subtree_root = next_root;
+            engine.spine.clear();
+
+            WHNF::perform(engine, callback);
+
+            let _head = engine.spine.pop();
+            for &app_node in &engine.spine {
+                if let Some(Node::App(_lhs, rhs)) = engine.arena.get(app_node) {
+                    work_stack.push(*rhs);
+                }
+            }
+        }
+    }
+}
+
+/// [Weak head normal form] reduction. Reduces until the head of the current
+/// term isn't saturated (doesn't have enough arguments to reduce).
+#[derive(Clone, Copy, Debug, Eq, Hash, Ord, PartialEq, PartialOrd)]
+pub enum WeakHeadNormalForm {}
+
+impl Default for WeakHeadNormalForm {
+    fn default() -> Self {
+        unreachable!("WeakHeadNormalForm default")
+    }
+}
+
+/// A type alias for [`WeakHeadNormalForm`].
+pub type WHNF = WeakHeadNormalForm;
+
+impl ReductionStrat for WeakHeadNormalForm {
+    fn perform<F>(engine: &mut Engine<RealArena>, callback: &mut Option<F>)
+    where
+        F: FnMut(&Engine<RealArena>),
+    {
+        let mut prev_reduction = ReductionState::Reduced;
+
+        while prev_reduction == ReductionState::Reduced {
+            let current = if let Some(&end) = engine.spine.last() {
+                match engine.arena.get(end) {
+                    Some(Node::App(lhs, _)) => *lhs,
+                    Some(_) => end,
+                    None => unreachable!(),
+                }
+            } else {
+                engine.subtree_root
+            };
+
+            engine.unwind(current);
+
+            prev_reduction = engine.reduce();
+
+            if let Some(f) = callback
+                && prev_reduction == ReductionState::Reduced
+            {
+                f(&engine);
+            }
+        }
     }
 }

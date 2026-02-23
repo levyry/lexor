@@ -1,5 +1,10 @@
-//! This module implements the time-linear and space-linear bracket abstraction
-//! algorithm found by Oleg Kiselyov.
+/*!
+This module implements the time-linear and space-linear bracket abstraction
+algorithm found by Oleg Kiselyov.
+
+TODO: Finish docs, add example
+*/
+
 #![allow(clippy::eq_op)]
 
 use crate::{combinator::Combinator, de_bruijn::DeBruijn};

@@ -1,3 +1,10 @@
+/*!
+This module provides a parser for parsing [`Lambda`] expressions.
+
+TODO: Finish docs, add example
+*/
+
+
 use crate::lambda::Lambda;
 use std::iter::Peekable;
 use std::str::Chars;

@@ -1,8 +1,15 @@
-#![allow(unused)]
+/*!
+This module provides a definition for a Lambda calculus term in the
+(locally nameless) De Bruijn representation.
+
+TODO: Finish docs, add example
+*/
 
 use std::vec;
 
 /// Reduction strategies. TODO: Write this doc.
+// TODO: Refactor this to work similarly to how we handle
+//       combinator reduction kinds (trait based)
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
 pub enum ReductionStrategy {
     CallByName,

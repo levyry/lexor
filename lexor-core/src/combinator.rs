@@ -1,3 +1,9 @@
+/*!
+This module provides a definition for a [`Combinator`].
+
+TODO: Finish docs, add example
+*/
+
 use core::fmt;
 use std::ops::BitAnd;
 

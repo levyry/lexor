@@ -11,7 +11,7 @@ lexor-core = { path = "./lexor-core", version = "*" }
 [workspace.package]
 version = "0.1.0"
 authors = ["Orbán Levente"]
-description = "SKI and Lambda calculus evaluation and conversion"
+description = "A compiler and VM for lambda calculus targeting combinators."
 
 [workspace.lints.clippy]
 pedantic = { level = "deny", priority = -1 }

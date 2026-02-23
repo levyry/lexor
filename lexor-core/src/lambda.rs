@@ -1,3 +1,10 @@
+/*!
+This module provides a definition for a Lambda calculus term in the
+standard representation.
+
+TODO: Finish docs, add example
+*/
+
 use core::fmt;
 
 use crate::de_bruijn::DeBruijn;
@@ -5,8 +12,11 @@ use crate::de_bruijn::DeBruijn;
 /// Represents an untyped lambda calculus term (not using De Bruijn indexing).
 #[derive(Clone, Debug, PartialEq, Eq)]
 pub enum Lambda {
+    /// Variable
     Var(String),
+    /// Abstraction
     Abs(String, Box<Self>),
+    /// Application
     App(Box<Self>, Box<Self>),
 }
 

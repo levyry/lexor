@@ -14,16 +14,37 @@ authors = ["Orbán Levente"]
 description = "A compiler and VM for lambda calculus targeting combinators."
 
 [workspace.lints.clippy]
-pedantic = { level = "deny", priority = -1 }
-nursery = { level = "deny", priority = -1 }
+suspicious = { level = "deny", priority = -1 }
+perf = { level = "deny", priority = -1 }
+style = { level = "warn", priority = -1 }
+pedantic = { level = "warn", priority = -1 }
+# cargo = { level = "deny", priority = -1 } # TODO: Enable before publishing crates
+nursery = { level = "warn", priority = -1 }
+
+# Harden
 unwrap_used = "deny"
-arithmetic_side_effects = "deny"
-clone_on_ref_ptr = "deny"
 expect_used = "warn"
 todo = "warn"
-panic = "warn"
-module_name_repetitions = "allow"
-assertions_on_constants = "allow"
+panic = "deny"
+if_then_some_else_none = "deny"
+impl_trait_in_params = "deny"
+str_to_string = "deny"
+implicit_clone = "deny"
+try_err = "deny"
+undocumented_unsafe_blocks = "deny"
+arithmetic_side_effects = "deny"
+# Soften
+too_long_first_doc_paragraph = "allow"
+single_match = "allow"
+result_unit_err = "allow"
+len_without_is_empty = "allow"
+enum_variant_names = "allow"
+new_ret_no_self = "allow"
+useless_asref = "allow"
+assigning_clones = "allow"
+vec_init_then_push = "allow"
+literal_string_with_formatting_args = "allow"
+unnecessary_map_or = "allow"
 
 [workspace.lints.rust]
 unsafe_code = "forbid"

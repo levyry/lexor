@@ -8,7 +8,7 @@ TODO: Finish docs, add example
 #![allow(clippy::eq_op)]
 
 use crate::{combinator::Combinator, de_bruijn::DeBruijn};
-
+use lower::saturating::math as saturating;
 use std::{
     cmp::Ordering,
     fmt::{self},
@@ -87,10 +87,13 @@ pub(crate) fn convert(deb: &DeBruijn) -> (usize, BulkCom) {
         DeBruijn::BVar(0) => (1, BulkCom::I),
         DeBruijn::BVar(n) => {
             let mut inner_acc = BulkCom::I;
-            let n1 = n.saturating_add(1);
+
+            let n1 = saturating!(n + 1);
+
             for i in 1..n1 {
                 inner_acc = apply((0, BulkCom::K), (i, inner_acc));
             }
+
             (n1, inner_acc)
         }
         DeBruijn::App(lhs, rhs) => {
@@ -103,7 +106,7 @@ pub(crate) fn convert(deb: &DeBruijn) -> (usize, BulkCom) {
             if n == 0 {
                 (0, BulkCom::K & inner)
             } else {
-                (n.saturating_sub(1), inner)
+                (saturating!(n - 1), inner)
             }
         }
         DeBruijn::FVar(_) => todo!(),
@@ -211,7 +214,7 @@ fn go(n: usize, base: Combinator) -> Combinator {
     let num_bits = if n == 0 {
         0
     } else {
-        usize::BITS.saturating_sub(n.leading_zeros())
+        saturating!(usize::BITS - n.leading_zeros())
     };
 
     (0..num_bits)

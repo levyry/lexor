@@ -7,6 +7,8 @@ TODO: Finish docs, add example
 
 use std::vec;
 
+use lower::saturating::math as saturating;
+
 /// Reduction strategies. TODO: Write this doc.
 // TODO: Refactor this to work similarly to how we handle
 //       combinator reduction kinds (trait based)
@@ -47,7 +49,7 @@ impl DeBruijn {
                 }
             }
 
-            Self::Abs(body) => Self::Abs(Box::new(body.var_closing(name, index.saturating_add(1)))),
+            Self::Abs(body) => Self::Abs(Box::new(body.var_closing(name, saturating!(index + 1)))),
 
             Self::App(lhs, rhs) => Self::App(
                 Box::new(lhs.var_closing(name.clone(), index)),
@@ -126,9 +128,7 @@ impl DeBruijn {
 
             Self::FVar(_) => self,
 
-            Self::Abs(body) => {
-                Self::Abs(Box::new(body.beta_reduce(index.saturating_add(1), other)))
-            }
+            Self::Abs(body) => Self::Abs(Box::new(body.beta_reduce(saturating!(index + 1), other))),
 
             Self::App(lhs, rhs) => Self::App(
                 Box::new(lhs.beta_reduce(index, other.clone())),

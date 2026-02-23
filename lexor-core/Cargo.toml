@@ -10,6 +10,7 @@ workspace = true
 
 [dependencies]
 chumsky = { workspace = true }
+lower = { workspace = true }
 
 [dev-dependencies]
 criterion = { version = "0.8", features = ["html_reports"] }

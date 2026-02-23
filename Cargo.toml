@@ -5,8 +5,8 @@ members = ["lexor-reducer", "lexor-core"]
 [workspace.dependencies]
 chumsky = "0.12"
 slotmap = "1.1.1"
+lower = "0.2.1"
 lexor-core = { path = "./lexor-core", version = "*" }
-
 
 [workspace.package]
 version = "0.1.0"

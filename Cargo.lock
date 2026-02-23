@@ -290,6 +290,7 @@ version = "0.1.0"
 dependencies = [
  "chumsky",
  "criterion",
+ "lower",
 ]
 
 [[package]]
@@ -299,6 +300,7 @@ dependencies = [
  "chumsky",
  "criterion",
  "lexor-core",
+ "lower",
  "slotmap",
 ]
 
@@ -307,6 +309,26 @@ name = "libc"
 version = "0.2.178"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "37c93d8daa9d8a012fd8ab92f088405fb202ea0b6ab73ee2482ae66af4f42091"
+
+[[package]]
+name = "lower"
+version = "0.2.1"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "9faac1cfe5c3c955d3caa12e501034062890c67c7dd756eedfcf38709eb917d9"
+dependencies = [
+ "lower-macros",
+]
+
+[[package]]
+name = "lower-macros"
+version = "0.2.12"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "2c6719f7ce86cb0dff1e1fb32e9f654433e9588f7d96d2f0b06c8676ab5054a6"
+dependencies = [
+ "proc-macro2",
+ "quote",
+ "syn",
+]
 
 [[package]]
 name = "memchr"

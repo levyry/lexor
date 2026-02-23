@@ -11,6 +11,7 @@ workspace = true
 [dependencies]
 chumsky = { workspace = true }
 slotmap = { workspace = true }
+lower = { workspace = true }
 lexor-core = { workspace = true }
 
 [dev-dependencies]

@@ -19,7 +19,7 @@ pub type RealArena = SlotMap<NodeKey, Node>;
 pub trait ReductionStrat:
     Clone + Copy + Debug + Default + Eq + Hash + Ord + PartialEq + PartialOrd + super::seal::Sealed
 {
-    fn perform<F: FnMut(EngineView)>(engine: &mut Engine<RealArena>, callback: &mut Option<F>);
+    fn perform(engine: &mut Engine<RealArena>, callback: &mut Option<impl FnMut(EngineView)>);
 
     /// Reduces the given `input` based on the strategy used to invoke this
     /// function and returns the result as a [`String`].
@@ -36,7 +36,7 @@ pub trait ReductionStrat:
     fn reduce(input: &str) -> String {
         let root = parse(input).expect("Invalid input");
         let mut engine = Engine::from_tree(root);
-        Self::perform::<fn(EngineView)>(&mut engine, &mut None);
+        Self::perform(&mut engine, &mut None::<fn(EngineView)>);
         format!("{engine}")
     }
 
@@ -74,10 +74,10 @@ pub trait ReductionStrat:
     /// assert_eq!(logs[8], "Step #9: KS(KSKS)KI\n");
     /// assert_eq!(logs[9], "Step #10: SKI\n");
     /// ```
-    fn reduce_with<F: FnMut(EngineView)>(input: &str, callback: F) -> String {
+    fn reduce_with(input: &str, callback: impl FnMut(EngineView)) -> String {
         let root = parse(input).expect("Invalid input");
         let mut engine = Engine::from_tree(root);
-        Self::perform::<F>(&mut engine, &mut Some(callback));
+        Self::perform(&mut engine, &mut Some(callback));
         format!("{engine}")
     }
 
@@ -94,7 +94,7 @@ pub trait ReductionStrat:
     fn compute(input: &str) {
         let root = parse(input).expect("Invalid input");
         let mut engine = Engine::from_tree(root);
-        Self::perform::<fn(EngineView)>(&mut engine, &mut None);
+        Self::perform(&mut engine, &mut None::<fn(EngineView)>);
     }
 
     /// Computes the desired form of the given `input`. Executes `callback`
@@ -114,10 +114,10 @@ pub trait ReductionStrat:
     ///
     /// assert_eq!(count, 1);
     /// ```
-    fn compute_with<F: FnMut(EngineView)>(input: &str, callback: F) {
+    fn compute_with(input: &str, callback: impl FnMut(EngineView)) {
         let root = parse(input).expect("Invalid input");
         let mut engine = Engine::from_tree(root);
-        Self::perform::<F>(&mut engine, &mut Some(callback));
+        Self::perform(&mut engine, &mut Some(callback));
     }
 }
 
@@ -125,7 +125,7 @@ pub trait ReductionStrat:
 /// leftmost-outermost redex to [`WeakHeadNormalForm`] until there are no more
 /// saturated redexes in the whole term.
 #[derive(Clone, Copy, Debug, Eq, Hash, Ord, PartialEq, PartialOrd)]
-pub enum NormalForm {}
+pub struct NormalForm;
 
 impl Default for NormalForm {
     fn default() -> Self {
@@ -137,10 +137,7 @@ impl Default for NormalForm {
 pub type NF = NormalForm;
 
 impl ReductionStrat for NormalForm {
-    fn perform<F>(engine: &mut Engine<RealArena>, callback: &mut Option<F>)
-    where
-        F: FnMut(EngineView),
-    {
+    fn perform(engine: &mut Engine<RealArena>, callback: &mut Option<impl FnMut(EngineView)>) {
         let mut work_stack = Vec::with_capacity(20);
         work_stack.push(engine.subtree_root);
 
@@ -163,7 +160,7 @@ impl ReductionStrat for NormalForm {
 /// [Weak head normal form] reduction. Reduces until the head of the current
 /// term isn't saturated (doesn't have enough arguments to reduce).
 #[derive(Clone, Copy, Debug, Eq, Hash, Ord, PartialEq, PartialOrd)]
-pub enum WeakHeadNormalForm {}
+pub struct WeakHeadNormalForm;
 
 impl Default for WeakHeadNormalForm {
     fn default() -> Self {
@@ -175,10 +172,7 @@ impl Default for WeakHeadNormalForm {
 pub type WHNF = WeakHeadNormalForm;
 
 impl ReductionStrat for WeakHeadNormalForm {
-    fn perform<F>(engine: &mut Engine<RealArena>, callback: &mut Option<F>)
-    where
-        F: FnMut(EngineView),
-    {
+    fn perform(engine: &mut Engine<RealArena>, callback: &mut Option<impl FnMut(EngineView)>) {
         let mut prev_reduction = ReductionState::Reduced;
 
         while prev_reduction == ReductionState::Reduced {

@@ -1,12 +1,15 @@
 use std::hint::black_box;
 
 use criterion::{Criterion, criterion_group, criterion_main};
-use lexor_reducer::{NF, ReductionStrat};
+use lexor_reducer::{EngineView, NF, ReductionStrat, core::engine::Engine, parse};
 
 fn reduction_benchmark(c: &mut Criterion) {
+    let root = parse("(S(KS)K(S(S(KS)K)(S(S(KS)K)(S(S(KS)K)I)))(S(S(KS)K)(S(S(KS)K)(S(S(KS)K)(S(S(KS)K)I)))))(S(S(KS)K)I)KI").unwrap();
+
     c.bench_function("church 2 20", |b| {
         b.iter(|| {
-            NF::compute(black_box("(S(KS)K(S(S(KS)K)(S(S(KS)K)(S(S(KS)K)I)))(S(S(KS)K)(S(S(KS)K)(S(S(KS)K)(S(S(KS)K)I)))))(S(S(KS)K)I)KI"));
+            let mut engine = black_box(Engine::from_tree(black_box(root.clone())));
+            NF::perform(&mut engine, &mut None::<fn(EngineView)>);
         });
     });
 }

@@ -20,13 +20,40 @@ pub struct Engine<Arn: Arena> {
     pub spine: Vec<NodeKey>,
     pub arena: Arn,
 }
-
+// #######################################
+// #              LOOK AT ME             #
+// #                ME BIG               #
+// #######################################
+//
+// TODO: Refactor this to make better use of types and pattern matching.
+//
+// Reasons: Currently, all the pushing and popping of arguments is
+// * slow
+// * complicated
+// * error-prone
+// * unergonomic
+//
+// Possible enhancements:
+// * Parse, don't validate (NonEmptyVec, other possiblities, have to think)
+// * for the love of god PLEASE also pattern match in the amount of elements in
+//   the vector... like it is very simple, match on (operator_node, spine.len),
+//   and then for each combinator I can make two cases: one where it's saturated
+//   and one where it's not.
+// * think about more ways to use `resolve_indirection`, it might be needed at
+//   more places
+// * Remove the generic Arena trait type, and just bake in SlotMap
+// * Move the Display impl over to `EngineView`, maybe make `print_node` a
+//   method?
+// * this will have to become a spineless tagless g-machine at some point anyway
+//   so don't spend _too_ much time on refactoring this
+//
+// Don't forget to benchmark with the old impl, just in case!
 impl<Arn> Engine<Arn>
 where
     Arn: Arena,
 {
     #[must_use]
-    pub(crate) fn from_tree(root: Combinator) -> Self {
+    pub fn from_tree(root: Combinator) -> Self {
         let mut arena = Arn::presized(10_000);
         let root = arena.flatten(root);
 

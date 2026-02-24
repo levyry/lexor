@@ -1,6 +1,6 @@
 //! A crate for efficiently parsing and reducing SKI combinator expressions.
 
-mod core;
+pub mod core;
 mod engineview;
 mod graphred;
 mod parser;

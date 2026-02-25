@@ -1,8 +1,8 @@
 use core::{fmt::Debug, hash::Hash};
 
+use lexor_parser::ski_parser::chumsky_parse as parse;
 use rootcause::{Report, bail};
 use slotmap::SlotMap;
-use lexor_parser::ski_parser::chumsky_parse as parse;
 
 use crate::{
     core::{

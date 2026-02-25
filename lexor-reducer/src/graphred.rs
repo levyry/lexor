@@ -1,5 +1,6 @@
 use core::{fmt::Debug, hash::Hash};
 
+use rootcause::{Report, bail};
 use slotmap::SlotMap;
 
 use crate::{
@@ -29,15 +30,22 @@ pub trait ReductionStrat:
     /// ```
     /// use lexor_reducer::{NF, ReductionStrat};
     ///
-    /// let result = NF::reduce("SKSKSSKSKSKSKSKSKSK");
+    /// let result = NF::reduce("SKSKSSKSKSKSKSKSKSK").unwrap();
     ///
     /// assert_eq!(result, "K");
     /// ```
-    fn reduce(input: &str) -> String {
-        let root = parse(input).expect("Invalid input");
+    ///
+    /// # Errors
+    ///
+    /// If the provided `input` cannot be parsed as a SKI expression.
+    fn reduce(input: &str) -> Result<String, Report> {
+        let Ok(root) = parse(input) else {
+            bail!("Failed to parse input: {input}");
+        };
+
         let mut engine = Engine::from_tree(root);
         Self::perform(&mut engine, &mut None::<fn(EngineView)>);
-        format!("{engine}")
+        Ok(format!("{}", EngineView::from_engine(&engine)))
     }
 
     /// Reduces the given `input` based on the strategy ued to invoke this
@@ -59,7 +67,7 @@ pub trait ReductionStrat:
     /// let result = NF::reduce_with("S(SKSKSSK)(SSKSKSK)I", |view| {
     ///                  count = count.saturating_add(1);
     ///                  logs.push(format!("Step #{count}: {view}\n"));
-    ///              });
+    ///              }).unwrap();
     ///
     /// assert_eq!(result, "SKI");
     /// assert_eq!(logs.len(), 10);
@@ -74,11 +82,18 @@ pub trait ReductionStrat:
     /// assert_eq!(logs[8], "Step #9: KS(KSKS)KI\n");
     /// assert_eq!(logs[9], "Step #10: SKI\n");
     /// ```
-    fn reduce_with(input: &str, callback: impl FnMut(EngineView)) -> String {
-        let root = parse(input).expect("Invalid input");
+    ///
+    /// # Errors
+    ///
+    /// If the provided `input` cannot be parsed as a SKI expression.
+    fn reduce_with(input: &str, callback: impl FnMut(EngineView)) -> Result<String, Report> {
+        let Ok(root) = parse(input) else {
+            bail!("Failed to parse input: {input}");
+        };
+
         let mut engine = Engine::from_tree(root);
         Self::perform(&mut engine, &mut Some(callback));
-        format!("{engine}")
+        Ok(format!("{}", EngineView::from_engine(&engine)))
     }
 
     /// Computes the desired form of the given `input`.
@@ -91,10 +106,17 @@ pub trait ReductionStrat:
     /// // Internally, this reduces to "S"
     /// NF::compute("KSI");
     /// ```
-    fn compute(input: &str) {
-        let root = parse(input).expect("Invalid input");
+    ///
+    /// # Errors
+    ///
+    /// If the provided `input` cannot be parsed as a SKI expression.
+    fn compute(input: &str) -> Result<(), Report> {
+        let Ok(root) = parse(input) else {
+            bail!("Failed to parse input: {input}");
+        };
         let mut engine = Engine::from_tree(root);
         Self::perform(&mut engine, &mut None::<fn(EngineView)>);
+        Ok(())
     }
 
     /// Computes the desired form of the given `input`. Executes `callback`
@@ -114,10 +136,18 @@ pub trait ReductionStrat:
     ///
     /// assert_eq!(count, 1);
     /// ```
-    fn compute_with(input: &str, callback: impl FnMut(EngineView)) {
-        let root = parse(input).expect("Invalid input");
+    ///
+    /// # Errors
+    ///
+    /// If the provided `input` cannot be parsed as a SKI expression.
+    fn compute_with(input: &str, callback: impl FnMut(EngineView)) -> Result<(), Report> {
+        let Ok(root) = parse(input) else {
+            bail!("Failed to parse input: {input}");
+        };
+
         let mut engine = Engine::from_tree(root);
         Self::perform(&mut engine, &mut Some(callback));
+        Ok(())
     }
 }
 

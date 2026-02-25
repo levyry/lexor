@@ -20,7 +20,6 @@
 - have to look at other projects to see what the community deems acceptable to put into a "core" crate vs. putting it into it's own crate
 - revisit lambda reduction implementation
 - use arena allocators for lambda as well
-- better error handling (more results with own error types)
 
 #### parsing
 

@@ -1,0 +1,12 @@
+[package]
+name = "lexor-parser"
+edition = "2024"
+version.workspace = true
+authors.workspace = true
+description.workspace = true
+
+[dependencies]
+chumsky = { workspace = true }
+
+[lints]
+workspace = true

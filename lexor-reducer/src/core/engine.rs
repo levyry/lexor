@@ -1,5 +1,5 @@
 use core::fmt;
-use lexor_core::combinator::Combinator;
+use lexor_parser::combinator::Combinator;
 
 use crate::{
     core::arena::Arena,

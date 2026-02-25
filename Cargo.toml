@@ -1,6 +1,6 @@
 [workspace]
 resolver = "3"
-members = ["lexor-reducer", "lexor-core"]
+members = ["lexor-reducer", "lexor-core", "lexor-parser"]
 
 [workspace.dependencies]
 chumsky = "0.12"
@@ -9,6 +9,7 @@ lower = "0.2.1"
 rootcause = "0.12.1"
 arrayvec = "0.7.6"
 lexor-core = { path = "./lexor-core", version = "*" }
+lexor-parser = { path = "./lexor-parser", version = "*" }
 
 [workspace.package]
 version = "0.1.0"

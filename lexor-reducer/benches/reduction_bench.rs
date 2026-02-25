@@ -1,7 +1,8 @@
 use std::hint::black_box;
 
 use criterion::{Criterion, criterion_group, criterion_main};
-use lexor_reducer::{EngineView, NF, ReductionStrat, core::engine::Engine, parse};
+use lexor_parser::ski_parser::chumsky_parse as parse;
+use lexor_reducer::{EngineView, NF, ReductionStrat, core::engine::Engine};
 
 fn reduction_benchmark(c: &mut Criterion) {
     let root = parse("(S(KS)K(S(S(KS)K)(S(S(KS)K)(S(S(KS)K)I)))(S(S(KS)K)(S(S(KS)K)(S(S(KS)K)(S(S(KS)K)I)))))(S(S(KS)K)I)KI").unwrap();

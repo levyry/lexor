@@ -7,6 +7,7 @@ TODO: Finish docs, add example
 
 use std::vec;
 
+use lexor_parser::lambda::Lambda;
 use lower::saturating::math as saturating;
 
 /// Reduction strategies. TODO: Write this doc.
@@ -180,5 +181,33 @@ impl DeBruijn {
                 _ => self,
             },
         }
+    }
+}
+
+impl From<Lambda> for DeBruijn {
+    fn from(expr: Lambda) -> Self {
+        fn convert(expr: Lambda, scope: &mut Vec<String>) -> DeBruijn {
+            match expr {
+                Lambda::Var(name) => scope
+                    .iter()
+                    .rev()
+                    .position(|n| n == &name)
+                    .map_or(DeBruijn::FVar(name), DeBruijn::BVar),
+
+                Lambda::Abs(arg, body) => {
+                    scope.push(arg);
+                    let body_de_bruijn = convert(*body, scope);
+                    scope.pop();
+                    DeBruijn::Abs(Box::new(body_de_bruijn))
+                }
+
+                Lambda::App(lhs, rhs) => DeBruijn::App(
+                    Box::new(convert(*lhs, scope)),
+                    Box::new(convert(*rhs, scope)),
+                ),
+            }
+        }
+
+        convert(expr, &mut Vec::new())
     }
 }

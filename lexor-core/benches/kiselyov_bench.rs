@@ -1,10 +1,11 @@
 use criterion::{Criterion, criterion_group, criterion_main};
 use lexor_core::{de_bruijn::DeBruijn, kiselyov::kiselyov};
+use lexor_parser::lambda_parser::chumsky_parse as parse;
 use std::hint::black_box;
 
 fn kiselyov_bench(c: &mut Criterion) {
     let input = "λx.λy.x";
-    let lambda = lexor_core::parser::parse(input).unwrap();
+    let lambda = parse(input).unwrap_or_else(|_| unreachable!());
 
     let deb: DeBruijn = lambda.into();
 

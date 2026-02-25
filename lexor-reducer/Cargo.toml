@@ -14,6 +14,7 @@ slotmap = { workspace = true }
 lower = { workspace = true }
 rootcause = { workspace = true }
 lexor-core = { workspace = true }
+lexor-parser = { workspace = true }
 
 [dev-dependencies]
 criterion = { version = "0.8", features = ["html_reports"] }

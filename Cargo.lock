@@ -306,8 +306,16 @@ version = "0.1.0"
 dependencies = [
  "chumsky",
  "criterion",
+ "lexor-parser",
  "lower",
  "rootcause",
+]
+
+[[package]]
+name = "lexor-parser"
+version = "0.1.0"
+dependencies = [
+ "chumsky",
 ]
 
 [[package]]
@@ -317,6 +325,7 @@ dependencies = [
  "chumsky",
  "criterion",
  "lexor-core",
+ "lexor-parser",
  "lower",
  "rootcause",
  "slotmap",

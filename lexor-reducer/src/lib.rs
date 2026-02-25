@@ -3,11 +3,9 @@
 pub mod core;
 mod engineview;
 mod graphred;
-mod parser;
 
 pub use engineview::EngineView;
 pub use graphred::{NF, ReductionStrat, WHNF};
-pub use parser::parse;
 
 mod seal {
     use crate::graphred;

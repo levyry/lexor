@@ -8,11 +8,5 @@ TODO: Finish once done with crate. Add example.
 [Combinator]: https://en.wikipedia.org/wiki/Combinatory_logic
 */
 
-pub mod combinator;
 pub mod de_bruijn;
 pub mod kiselyov;
-pub mod lambda;
-pub mod parser;
-
-pub use lambda::Lambda;
-pub use parser::{ParseError, parse};

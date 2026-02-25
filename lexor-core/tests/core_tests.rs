@@ -1,13 +1,14 @@
 use lexor_core::de_bruijn::DeBruijn;
 use lexor_core::kiselyov::{BulkResolver, kiselyov};
+use lexor_parser::lambda_parser::chumsky_parse as parse;
 
 #[test]
 fn test_pipeline() {
     // 1. Parse
     let input = "λx.λy.x";
-    let lambda = lexor_core::parser::parse(input).unwrap();
+    let lambda = parse(input).unwrap_or_else(|_| unreachable!());
 
-    let deb: DeBruijn = From::from(lambda);
+    let deb: DeBruijn = lambda.into();
 
     let result = kiselyov(&deb, &BulkResolver::Logarithmic).1;
 

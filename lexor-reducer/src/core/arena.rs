@@ -1,7 +1,7 @@
 use std::fmt::Debug;
 
 use crate::core::node::{Node, NodeComb, NodeKey};
-use lexor_core::combinator::Combinator;
+use lexor_parser::combinator::Combinator;
 use slotmap::SlotMap;
 
 // Abstract away the concrete arena impl
@@ -32,7 +32,6 @@ pub trait Arena: Default + Debug {
                 let r_key = self.flatten(*rhs);
                 self.insert(Node::App(l_key, r_key))
             }
-            Combinator::Var(_) => todo!(),
         }
     }
 }

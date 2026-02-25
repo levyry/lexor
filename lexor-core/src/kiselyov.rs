@@ -7,7 +7,8 @@ TODO: Finish docs, add example
 
 #![allow(clippy::eq_op)]
 
-use crate::{combinator::Combinator, de_bruijn::DeBruijn};
+use crate::de_bruijn::DeBruijn;
+use lexor_parser::combinator::Combinator;
 use lower::saturating::math as saturating;
 use std::{
     cmp::Ordering,

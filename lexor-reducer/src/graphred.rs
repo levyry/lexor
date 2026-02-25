@@ -2,25 +2,22 @@ use core::{fmt::Debug, hash::Hash};
 
 use lexor_parser::ski_parser::chumsky_parse as parse;
 use rootcause::{Report, bail};
-use slotmap::SlotMap;
 
 use crate::{
     core::{
         engine::{Engine, ReductionState},
-        node::{Node, NodeKey},
+        node::Node,
     },
     engineview::EngineView,
 };
 
-pub type RealArena = SlotMap<NodeKey, Node>;
-
-/// The kind of reductions the [`ReductionMachine`] can perform.
+/// A reduction strategy.
 ///
 /// Note that this trait is sealed.
 pub trait ReductionStrat:
     Clone + Copy + Debug + Default + Eq + Hash + Ord + PartialEq + PartialOrd + super::seal::Sealed
 {
-    fn perform(engine: &mut Engine<RealArena>, callback: &mut Option<impl FnMut(EngineView)>);
+    fn perform(engine: &mut Engine, callback: &mut Option<impl FnMut(EngineView)>);
 
     /// Reduces the given `input` based on the strategy used to invoke this
     /// function and returns the result as a [`String`].
@@ -154,6 +151,8 @@ pub trait ReductionStrat:
 /// [Normal form] reduction strategy. Always reduces the current
 /// leftmost-outermost redex to [`WeakHeadNormalForm`] until there are no more
 /// saturated redexes in the whole term.
+///
+/// [Normal form]: https://en.wikipedia.org/wiki/Beta_normal_form#Normal_forms
 #[derive(Clone, Copy, Debug, Eq, Hash, Ord, PartialEq, PartialOrd)]
 pub struct NormalForm;
 
@@ -167,7 +166,7 @@ impl Default for NormalForm {
 pub type NF = NormalForm;
 
 impl ReductionStrat for NormalForm {
-    fn perform(engine: &mut Engine<RealArena>, callback: &mut Option<impl FnMut(EngineView)>) {
+    fn perform(engine: &mut Engine, callback: &mut Option<impl FnMut(EngineView)>) {
         let mut work_stack = Vec::with_capacity(20);
         work_stack.push(engine.subtree_root);
 
@@ -202,7 +201,7 @@ impl Default for WeakHeadNormalForm {
 pub type WHNF = WeakHeadNormalForm;
 
 impl ReductionStrat for WeakHeadNormalForm {
-    fn perform(engine: &mut Engine<RealArena>, callback: &mut Option<impl FnMut(EngineView)>) {
+    fn perform(engine: &mut Engine, callback: &mut Option<impl FnMut(EngineView)>) {
         let mut prev_reduction = ReductionState::Reduced;
 
         while prev_reduction == ReductionState::Reduced {
@@ -218,7 +217,7 @@ impl ReductionStrat for WeakHeadNormalForm {
 
             engine.unwind(current);
 
-            prev_reduction = engine.reduce();
+            prev_reduction = engine.reduce().expect("Reduction failure");
 
             if let Some(f) = callback
                 && prev_reduction == ReductionState::Reduced

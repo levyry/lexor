@@ -1,10 +1,14 @@
-use core::fmt;
+use arrayvec::ArrayVec;
 use lexor_parser::combinator::Combinator;
+use lower::saturating::math as saturating;
+use rootcause::{Report, option_ext::OptionExt, report};
 
-use crate::{
-    core::arena::Arena,
-    core::node::{Node, NodeComb, NodeKey},
+use crate::core::{
+    arena::Arena,
+    node::{Node, NodeComb, NodeKey},
 };
+
+const PRESIZE: usize = 10_000;
 
 #[derive(Debug, Clone, Copy, Default, PartialEq, Eq)]
 pub enum ReductionState {
@@ -14,47 +18,18 @@ pub enum ReductionState {
 }
 
 #[derive(Debug, Clone)]
-pub struct Engine<Arn: Arena> {
+pub struct Engine {
     pub root: NodeKey,
     pub subtree_root: NodeKey,
     pub spine: Vec<NodeKey>,
-    pub arena: Arn,
+    pub arena: Arena,
 }
-// #######################################
-// #              LOOK AT ME             #
-// #                ME BIG               #
-// #######################################
-//
-// TODO: Refactor this to make better use of types and pattern matching.
-//
-// Reasons: Currently, all the pushing and popping of arguments is
-// * slow
-// * complicated
-// * error-prone
-// * unergonomic
-//
-// Possible enhancements:
-// * Parse, don't validate (NonEmptyVec, other possiblities, have to think)
-// * for the love of god PLEASE also pattern match in the amount of elements in
-//   the vector... like it is very simple, match on (operator_node, spine.len),
-//   and then for each combinator I can make two cases: one where it's saturated
-//   and one where it's not.
-// * think about more ways to use `resolve_indirection`, it might be needed at
-//   more places
-// * Remove the generic Arena trait type, and just bake in SlotMap
-// * Move the Display impl over to `EngineView`, maybe make `print_node` a
-//   method?
-// * this will have to become a spineless tagless g-machine at some point anyway
-//   so don't spend _too_ much time on refactoring this
-//
-// Don't forget to benchmark with the old impl, just in case!
-impl<Arn> Engine<Arn>
-where
-    Arn: Arena,
-{
+
+impl Engine {
     #[must_use]
     pub fn from_tree(root: Combinator) -> Self {
-        let mut arena = Arn::presized(10_000);
+        let mut arena = Arena::presized(PRESIZE);
+
         let root = arena.flatten(root);
 
         Self {
@@ -78,14 +53,13 @@ where
                 // Empty spine, parent is root
                 self.subtree_root = target;
             }
-
             current = target;
         }
 
         current
     }
 
-    pub(crate) fn unwind(&mut self, current: NodeKey) {
+    pub fn unwind(&mut self, current: NodeKey) {
         let mut current = current;
         loop {
             match self.arena.get(current) {
@@ -107,143 +81,55 @@ where
             }
         }
     }
+    pub fn reduce(&mut self) -> Result<ReductionState, Report> {
+        let redex_key = self.spine.pop().context("Tried reducing on empty spine")?;
 
-    pub(crate) fn reduce(&mut self) -> ReductionState {
-        let Some(operator_key) = self.spine.pop() else {
-            return ReductionState::Halted;
+        let &Node::Comb(redex) = self.arena.get(redex_key).context("Missing key in arena")? else {
+            return Err(report!("Tried reducing something that isn't a Node::Comb"));
         };
 
-        let Some(redex_root) = self.spine.pop() else {
-            self.spine.push(operator_key);
-            return ReductionState::Halted;
+        let arg_count = match redex {
+            NodeComb::I => 1,
+            NodeComb::K => 2,
+            NodeComb::S | NodeComb::C | NodeComb::B => 3,
         };
 
-        let operator_node = self.arena.get(operator_key);
+        let spine_len = self.spine.len();
 
-        let result = match operator_node {
-            Some(&Node::Comb(operator)) => match operator {
-                NodeComb::S | NodeComb::B | NodeComb::C => {
-                    self.reduce_three_args(operator, redex_root)
-                }
-                NodeComb::K => self.reduce_two_args(operator, redex_root),
-                NodeComb::I => {
-                    if let Some(x) = self.arena.get_arg(redex_root) {
-                        self.arena.replace(redex_root, Node::Indirection(x));
-                        ReductionState::Reduced
-                    } else {
-                        ReductionState::Halted
-                    }
-                }
-            },
-            Some(x) => unreachable!("Tried reducing something that isn't a comb: {x:?}"),
-            None => unreachable!(),
-        };
-
-        if matches!(result, ReductionState::Halted) {
-            self.spine.push(redex_root);
-            self.spine.push(operator_key);
+        if spine_len < arg_count {
+            self.spine.push(redex_key);
+            return Ok(ReductionState::Halted);
         }
 
-        result
-    }
+        let drain_index = saturating! { spine_len - arg_count };
 
-    fn reduce_three_args(&mut self, operator: NodeComb, redex_root: NodeKey) -> ReductionState {
-        let Some(parent) = self.spine.pop() else {
-            return ReductionState::Halted;
-        };
+        let roots: ArrayVec<NodeKey, 3> = self.spine.drain(drain_index..spine_len).collect();
 
-        let Some(grandparent) = self.spine.pop() else {
-            self.spine.push(parent);
-            return ReductionState::Halted;
-        };
+        let args: ArrayVec<NodeKey, 3> = roots
+            .iter()
+            .rev()
+            .map(|&key| self.arena.get_arg(key))
+            .collect();
 
-        if let Some(x) = self.arena.get_arg(redex_root)
-            && let Some(y) = self.arena.get_arg(parent)
-            && let Some(z) = self.arena.get_arg(grandparent)
-        {
-            let result = match operator {
-                NodeComb::S => {
-                    let xz = self.arena.insert(Node::App(x, z));
-                    let yz = self.arena.insert(Node::App(y, z));
-                    Node::App(xz, yz)
-                }
-                NodeComb::B => {
-                    let yz = self.arena.insert(Node::App(y, z));
-                    Node::App(x, yz)
-                }
-                NodeComb::C => {
-                    let xz = self.arena.insert(Node::App(x, z));
-                    Node::App(xz, y)
-                }
-                _ => unreachable!("Tried reducing three args on a comb that doesn't take three"),
-            };
-            self.arena.replace(grandparent, result);
-            ReductionState::Reduced
-        } else {
-            self.spine.push(grandparent);
-            self.spine.push(parent);
-            ReductionState::Halted
-        }
-    }
-
-    fn reduce_two_args(&mut self, operator: NodeComb, redex_root: NodeKey) -> ReductionState {
-        let Some(parent) = self.spine.pop() else {
-            return ReductionState::Halted;
-        };
-
-        if let Some(x) = self.arena.get_arg(redex_root)
-            && let Some(_y) = self.arena.get_arg(parent)
-        {
-            let result = match operator {
-                NodeComb::K => Node::Indirection(x),
-                _ => unreachable!("Tried reducing two args on a comb that doesn't take two"),
-            };
-            self.arena.replace(parent, result);
-            ReductionState::Reduced
-        } else {
-            self.spine.push(parent);
-            ReductionState::Halted
-        }
-    }
-}
-
-impl<Arn> fmt::Display for Engine<Arn>
-where
-    Arn: Arena + Default,
-{
-    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
-        fn print_node(
-            arena: &impl Arena,
-            key: NodeKey,
-            f: &mut fmt::Formatter<'_>,
-            is_rhs_of_app: bool,
-        ) -> fmt::Result {
-            let mut current = key;
-            while let Some(Node::Indirection(target)) = arena.get(current) {
-                current = *target;
+        let result = match redex {
+            NodeComb::I | NodeComb::K => Node::Indirection(args[0]),
+            NodeComb::S => {
+                let xz = self.arena.insert(Node::App(args[0], args[2]));
+                let yz = self.arena.insert(Node::App(args[1], args[2]));
+                Node::App(xz, yz)
             }
-
-            match arena.get(current) {
-                Some(Node::App(lhs, rhs)) => {
-                    if is_rhs_of_app {
-                        write!(f, "(")?;
-                    }
-
-                    print_node(arena, *lhs, f, false)?;
-                    // write!(f, " ")?;
-                    print_node(arena, *rhs, f, true)?;
-
-                    if is_rhs_of_app {
-                        write!(f, ")")?;
-                    }
-                    Ok(())
-                }
-                Some(Node::Comb(x)) => write!(f, "{x}"),
-                Some(Node::Indirection(_)) => unreachable!("Indirections resolved already"),
-                None => unreachable!("Node not found in arena"),
+            NodeComb::B => {
+                let yz = self.arena.insert(Node::App(args[1], args[2]));
+                Node::App(args[0], yz)
             }
-        }
+            NodeComb::C => {
+                let xz = self.arena.insert(Node::App(args[0], args[2]));
+                Node::App(xz, args[1])
+            }
+        };
 
-        print_node(&self.arena, self.root, f, false)
+        self.arena.replace(roots[0], result);
+
+        Ok(ReductionState::Reduced)
     }
 }

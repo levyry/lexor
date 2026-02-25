@@ -110,7 +110,7 @@ pub(crate) fn convert(deb: &DeBruijn) -> (usize, BulkCom) {
                 (saturating!(n - 1), inner)
             }
         }
-        DeBruijn::FVar(_) => todo!(),
+        DeBruijn::FVar(_) => todo!("What to do with free variables?"),
     }
 }
 

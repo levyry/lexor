@@ -9,7 +9,6 @@ edition = "2024"
 workspace = true
 
 [dependencies]
-chumsky = { workspace = true }
 rootcause = { workspace = true }
 lower = { workspace = true }
 lexor-parser = { workspace = true }

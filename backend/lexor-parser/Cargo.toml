@@ -1,6 +1,6 @@
 [package]
 name = "lexor-parser"
-edition = "2024"
+edition.workspace = true
 version.workspace = true
 authors.workspace = true
 description.workspace = true

@@ -1,0 +1,13 @@
+[build]
+target = "frontend/lexor-wasm/index.html"
+html_output = "index.html"
+release = false
+dist = "frontend/lexor-wasm/dist"
+public_url = "/"
+filehash = false
+inject_scripts = true
+offline = false
+frozen = false
+locked = false
+minify = "on_release"
+no_sri = false

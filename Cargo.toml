@@ -1,6 +1,11 @@
 [workspace]
 resolver = "3"
-members = ["lexor-reducer", "lexor-core", "lexor-parser"]
+members = [
+    "./backend/lexor-reducer",
+    "./backend/lexor-core",
+    "./backend/lexor-parser",
+    "./frontend/lexor-wasm",
+]
 
 [workspace.dependencies]
 chumsky = "0.12.0"
@@ -8,12 +13,14 @@ slotmap = "1.1.1"
 lower = "0.2.1"
 rootcause = "0.12.1"
 arrayvec = "0.7.6"
-lexor-core = { path = "./lexor-core", version = "*" }
-lexor-parser = { path = "./lexor-parser", version = "*" }
+lexor-core = { path = "./backend/lexor-core", version = "*" }
+lexor-parser = { path = "./backend/lexor-parser", version = "*" }
+lexor-reducer = { path = "./backend/lexor-reducer", version = "*" }
 
 [workspace.package]
+edition = "2024"
 version = "0.1.0"
-authors = ["Orbán Levente"]
+authors = ["Orbán Levente <orban.levente.laszlo@gmail.com>"]
 description = "A compiler and VM for lambda calculus targeting combinators."
 
 [workspace.lints.clippy]
@@ -56,5 +63,9 @@ unsafe_code = "forbid"
 
 [profile.release]
 lto = "fat"
+opt-level = 3
 codegen-units = 1
 panic = "abort"
+
+[profile.release.package.lexor-wasm]
+opt-level = "s"

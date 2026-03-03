@@ -2,8 +2,8 @@
 name = "lexor-core"
 version.workspace = true
 authors.workspace = true
+edition.workspace = true
 description = "Contains common, core lexor functionality"
-edition = "2024"
 
 [lints]
 workspace = true

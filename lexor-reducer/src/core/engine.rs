@@ -81,6 +81,7 @@ impl Engine {
             }
         }
     }
+
     pub fn reduce(&mut self) -> Result<ReductionState, Report> {
         let redex_key = self.spine.pop().context("Tried reducing on empty spine")?;
 
@@ -88,11 +89,7 @@ impl Engine {
             return Err(report!("Tried reducing something that isn't a Node::Comb"));
         };
 
-        let arg_count = match redex {
-            NodeComb::I => 1,
-            NodeComb::K => 2,
-            NodeComb::S | NodeComb::C | NodeComb::B => 3,
-        };
+        let arg_count = redex.arity();
 
         let spine_len = self.spine.len();
 

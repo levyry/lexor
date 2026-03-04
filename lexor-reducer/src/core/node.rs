@@ -23,6 +23,17 @@ pub enum NodeComb {
     C,
 }
 
+impl NodeComb {
+    #[must_use]
+    pub const fn arity(&self) -> usize {
+        match *self {
+            Self::I => 1,
+            Self::K => 2,
+            Self::S | Self::C | Self::B => 3,
+        }
+    }
+}
+
 impl fmt::Display for NodeComb {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         match self {

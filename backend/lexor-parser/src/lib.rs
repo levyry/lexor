@@ -38,14 +38,8 @@ pub mod combinator {
                 Self::I => write!(f, "I"),
                 Self::B => write!(f, "B"),
                 Self::C => write!(f, "C"),
-                // TODO: Rewrite once if let guards land in stable/nightly
-                Self::App(lhs, rhs) => {
-                    if let Self::App(_, _) = **rhs {
-                        write!(f, "{lhs}({rhs})")
-                    } else {
-                        write!(f, "{lhs}{rhs}")
-                    }
-                }
+                Self::App(lhs, rhs) if let Self::App(_, _) = **rhs => write!(f, "{lhs}({rhs})"),
+                Self::App(lhs, rhs) => write!(f, "{lhs}{rhs}"),
             }
         }
     }
@@ -77,14 +71,8 @@ pub mod lambda {
             match self {
                 Self::Var(name) => write!(f, "{name}"),
                 Self::Abs(name, lambda_expr) => write!(f, "λ{name}.{lambda_expr}"),
-                // TODO: Rewrite once if let guards land in stable/nightly
-                Self::App(lhs, rhs) => {
-                    if let Self::App(_, _) = **rhs {
-                        write!(f, "({lhs})({rhs})")
-                    } else {
-                        write!(f, "({lhs}){rhs}")
-                    }
-                }
+                Self::App(lhs, rhs) if let Self::App(_, _) = **rhs => write!(f, "({lhs})({rhs})"),
+                Self::App(lhs, rhs) => write!(f, "({lhs}){rhs}"),
             }
         }
     }

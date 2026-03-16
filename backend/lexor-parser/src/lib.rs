@@ -1,3 +1,7 @@
+/*!
+A crate for several parsing related data structures and parsers.
+*/
+
 pub mod combinator {
     /*!
     This module provides a definition for a [`Combinator`]. This is only used
@@ -79,6 +83,9 @@ pub mod lambda {
 }
 
 pub mod ski_parser {
+    /*!
+    This module provides a ski parser implemented with chumsky.
+    */
     use crate::combinator::Combinator;
     use chumsky::prelude::*;
 

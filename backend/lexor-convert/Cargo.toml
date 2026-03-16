@@ -1,15 +1,13 @@
 [package]
-name = "lexor-parser"
+name = "lexor-convert"
 edition.workspace = true
 version.workspace = true
 authors.workspace = true
 description.workspace = true
 
 [dependencies]
-chumsky = { workspace = true }
-thiserror = { workspace = true }
+lower = { workspace = true }
 lexor-core = { workspace = true }
-
 
 [lints]
 workspace = true

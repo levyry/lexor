@@ -1539,13 +1539,19 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "e2db585e1d738fc771bf08a151420d3ed193d9d895a36df7f6f8a9456b911ddc"
 
 [[package]]
+name = "lexor-convert"
+version = "0.1.0"
+dependencies = [
+ "lexor-core",
+ "lower",
+]
+
+[[package]]
 name = "lexor-core"
 version = "0.1.0"
 dependencies = [
- "criterion",
- "lexor-parser",
  "lower",
- "rootcause",
+ "thiserror 2.0.18",
 ]
 
 [[package]]
@@ -1553,6 +1559,8 @@ name = "lexor-parser"
 version = "0.1.0"
 dependencies = [
  "chumsky",
+ "lexor-core",
+ "thiserror 2.0.18",
 ]
 
 [[package]]
@@ -1564,8 +1572,8 @@ dependencies = [
  "lexor-core",
  "lexor-parser",
  "lower",
- "rootcause",
  "slotmap",
+ "thiserror 2.0.18",
 ]
 
 [[package]]
@@ -2556,28 +2564,6 @@ dependencies = [
 ]
 
 [[package]]
-name = "rootcause"
-version = "0.12.1"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "4fc4bd36159c7ce180fe2de1e5371ef107a2885f0048430f631e78202e2255d4"
-dependencies = [
- "hashbrown 0.16.1",
- "indexmap",
- "rootcause-internals",
- "rustc-hash 2.1.1",
- "triomphe",
-]
-
-[[package]]
-name = "rootcause-internals"
-version = "0.12.1"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "4d0df4f84d119d09b5c9c9e8db0fe9bfb5b47b04d0bb95b0763cf81bd9baa559"
-dependencies = [
- "triomphe",
-]
-
-[[package]]
 name = "rustc-hash"
 version = "1.1.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -2975,12 +2961,6 @@ name = "tracing-core"
 version = "0.1.36"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "db97caf9d906fbde555dd62fa95ddba9eecfd14cb388e4f491a66d74cd5fb79a"
-
-[[package]]
-name = "triomphe"
-version = "0.1.15"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "dd69c5aa8f924c7519d6372789a74eac5b94fb0f8fcf0d4a97eb0bfc3e785f39"
 
 [[package]]
 name = "ttf-parser"

@@ -7,16 +7,20 @@ TODO: Finish docs, add example
 
 use std::vec;
 
-use lexor_parser::lambda::Lambda;
 use lower::saturating::math as saturating;
+
+use crate::lambda::Lambda;
 
 /// Reduction strategies. TODO: Write this doc.
 // TODO: Refactor this to work similarly to how we handle
 //       combinator reduction kinds (trait based)
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
 pub enum ReductionStrategy {
+    /// Call by name
     CallByName,
+    /// Call by value
     CallByValue,
+    /// Normal order
     NormalOrder,
 }
 
@@ -25,9 +29,13 @@ pub enum ReductionStrategy {
 /// Based on: <https://chargueraud.org/research/2009/ln/main.pdf>
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub enum DeBruijn {
+    /// Bound variable
     BVar(usize),
+    /// Free variable
     FVar(String),
+    /// Abstraction
     Abs(Box<Self>),
+    /// Application
     App(Box<Self>, Box<Self>),
 }
 
@@ -139,6 +147,7 @@ impl DeBruijn {
     }
 
     #[must_use]
+    /// Evaluate the expression with a [`ReductionStrategy`].
     pub fn evaluate(self, strat: ReductionStrategy) -> Self {
         match strat {
             ReductionStrategy::CallByName => match self {

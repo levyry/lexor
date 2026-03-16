@@ -5,12 +5,13 @@ mod engineview;
 mod graphred;
 
 pub use engineview::EngineView;
-pub use graphred::{NF, ReductionStrat, WHNF};
+pub use graphred::{NF, ReductionError, ReductionStrat, WHNF};
 
 mod seal {
     use crate::graphred;
 
     /// Seal traits so other crates can't implement anything that is sealed.
+    #[allow(unused)]
     pub trait Sealed {}
     impl Sealed for graphred::NormalForm {}
     impl Sealed for graphred::WeakHeadNormalForm {}

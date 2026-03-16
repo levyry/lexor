@@ -12,14 +12,14 @@ fn church(c: &mut Criterion) {
     c.bench_function("church 2 20", |b| {
         b.iter(|| {
             let engine = black_box(Engine::from_tree(black_box(root.clone())));
-            NF::perform(&mut black_box(engine), &mut None::<fn(EngineView)>);
+            let _ = NF::perform(&mut black_box(engine), &mut None::<fn(EngineView)>);
         });
     });
 
     c.bench_function("church 2 20 cb", |b| {
         b.iter(|| {
             let engine = black_box(Engine::from_tree(black_box(root.clone())));
-            NF::perform(
+            let _ = NF::perform(
                 &mut black_box(engine),
                 &mut Some(|view: EngineView<'_>| {
                     let _s = view.stack_depth();

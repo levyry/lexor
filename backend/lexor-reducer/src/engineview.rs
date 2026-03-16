@@ -29,6 +29,9 @@ impl<'a> EngineView<'a> {
     }
 }
 
+// TODO: Look into handling the two errors cases (resolved indirections and
+//       missing nodes from arena) instead of just writing the error to the
+//       result.
 impl Display for EngineView<'_> {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         fn print_node(
@@ -38,12 +41,12 @@ impl Display for EngineView<'_> {
             is_rhs_of_app: bool,
         ) -> fmt::Result {
             let mut current = key;
-            while let Some(Node::Indirection(target)) = arena.get(current) {
+            while let Ok(Node::Indirection(target)) = arena.get(current) {
                 current = *target;
             }
 
             match arena.get(current) {
-                Some(Node::App(lhs, rhs)) => {
+                Ok(Node::App(lhs, rhs)) => {
                     if is_rhs_of_app {
                         write!(f, "(")?;
                     }
@@ -57,9 +60,9 @@ impl Display for EngineView<'_> {
                     }
                     Ok(())
                 }
-                Some(Node::Comb(x)) => write!(f, "{x}"),
-                Some(Node::Indirection(_)) => unreachable!("Indirections resolved already"),
-                None => unreachable!("Node not found in arena"),
+                Ok(Node::Comb(x)) => write!(f, "{x}"),
+                Ok(Node::Indirection(_)) => write!(f, "Somehow found an indirection"),
+                Err(err) => write!(f, "{err}"),
             }
         }
 

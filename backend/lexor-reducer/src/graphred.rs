@@ -1,7 +1,7 @@
 use core::{fmt::Debug, hash::Hash};
 
-use lexor_parser::ski_parser::chumsky_parse as parse;
-use rootcause::{Report, bail};
+use lexor_parser::ski_parser::{ParsingError::ChumskyError, chumsky_parse as parse};
+use thiserror::Error;
 
 use crate::{
     core::{
@@ -11,13 +11,31 @@ use crate::{
     engineview::EngineView,
 };
 
+#[derive(Error, Debug, PartialEq, Eq)]
+pub enum ReductionError {
+    #[error("Arena error: {0}")]
+    Arena(#[from] crate::core::arena::ArenaError),
+    #[error("Engine error: {0}")]
+    Engine(#[from] crate::core::engine::EngineError),
+    #[error("Parsing error: {0}")]
+    Parsing(#[from] lexor_parser::ski_parser::ParsingError),
+}
+
+type Result<T> = core::result::Result<T, ReductionError>;
+
 /// A reduction strategy.
 ///
 /// Note that this trait is sealed.
 pub trait ReductionStrat:
     Clone + Copy + Debug + Default + Eq + Hash + Ord + PartialEq + PartialOrd + super::seal::Sealed
 {
-    fn perform(engine: &mut Engine, callback: &mut Option<impl FnMut(EngineView)>);
+    /// Performs the given reduction.
+    ///
+    /// # Errors
+    ///
+    /// When either the parser, the arena allocator or the reduction engine
+    /// errors out.
+    fn perform(engine: &mut Engine, callback: &mut Option<impl FnMut(EngineView)>) -> Result<()>;
 
     /// Reduces the given `input` based on the strategy used to invoke this
     /// function and returns the result as a [`String`].
@@ -35,13 +53,11 @@ pub trait ReductionStrat:
     /// # Errors
     ///
     /// If the provided `input` cannot be parsed as a SKI expression.
-    fn reduce(input: &str) -> Result<String, Report> {
-        let Ok(root) = parse(input) else {
-            bail!("Failed to parse input: {input}");
-        };
+    fn reduce(input: &str) -> Result<String> {
+        let root = parse(input).map_err(|_| ChumskyError)?;
 
         let mut engine = Engine::from_tree(root);
-        Self::perform(&mut engine, &mut None::<fn(EngineView)>);
+        Self::perform(&mut engine, &mut None::<fn(EngineView)>)?;
         Ok(format!("{}", EngineView::from_engine(&engine)))
     }
 
@@ -83,13 +99,11 @@ pub trait ReductionStrat:
     /// # Errors
     ///
     /// If the provided `input` cannot be parsed as a SKI expression.
-    fn reduce_with(input: &str, callback: impl FnMut(EngineView)) -> Result<String, Report> {
-        let Ok(root) = parse(input) else {
-            bail!("Failed to parse input: {input}");
-        };
+    fn reduce_with(input: &str, callback: impl FnMut(EngineView)) -> Result<String> {
+        let root = parse(input).map_err(|_| ChumskyError)?;
 
         let mut engine = Engine::from_tree(root);
-        Self::perform(&mut engine, &mut Some(callback));
+        Self::perform(&mut engine, &mut Some(callback))?;
         Ok(format!("{}", EngineView::from_engine(&engine)))
     }
 
@@ -107,12 +121,11 @@ pub trait ReductionStrat:
     /// # Errors
     ///
     /// If the provided `input` cannot be parsed as a SKI expression.
-    fn compute(input: &str) -> Result<(), Report> {
-        let Ok(root) = parse(input) else {
-            bail!("Failed to parse input: {input}");
-        };
+    fn compute(input: &str) -> Result<()> {
+        let root = parse(input).map_err(|_| ChumskyError)?;
+
         let mut engine = Engine::from_tree(root);
-        Self::perform(&mut engine, &mut None::<fn(EngineView)>);
+        Self::perform(&mut engine, &mut None::<fn(EngineView)>)?;
         Ok(())
     }
 
@@ -137,13 +150,11 @@ pub trait ReductionStrat:
     /// # Errors
     ///
     /// If the provided `input` cannot be parsed as a SKI expression.
-    fn compute_with(input: &str, callback: impl FnMut(EngineView)) -> Result<(), Report> {
-        let Ok(root) = parse(input) else {
-            bail!("Failed to parse input: {input}");
-        };
+    fn compute_with(input: &str, callback: impl FnMut(EngineView)) -> Result<()> {
+        let root = parse(input).map_err(|_| ChumskyError)?;
 
         let mut engine = Engine::from_tree(root);
-        Self::perform(&mut engine, &mut Some(callback));
+        Self::perform(&mut engine, &mut Some(callback))?;
         Ok(())
     }
 }
@@ -158,7 +169,7 @@ pub struct NormalForm;
 
 impl Default for NormalForm {
     fn default() -> Self {
-        unreachable!("NormalForm default")
+        Self
     }
 }
 
@@ -166,7 +177,7 @@ impl Default for NormalForm {
 pub type NF = NormalForm;
 
 impl ReductionStrat for NormalForm {
-    fn perform(engine: &mut Engine, callback: &mut Option<impl FnMut(EngineView)>) {
+    fn perform(engine: &mut Engine, callback: &mut Option<impl FnMut(EngineView)>) -> Result<()> {
         let mut work_stack = Vec::with_capacity(20);
         work_stack.push(engine.subtree_root);
 
@@ -174,15 +185,17 @@ impl ReductionStrat for NormalForm {
             engine.subtree_root = next_root;
             engine.spine.clear();
 
-            WHNF::perform(engine, callback);
+            WHNF::perform(engine, callback)?;
 
             let _head = engine.spine.pop();
             for &app_node in &engine.spine {
-                if let Some(Node::App(_lhs, rhs)) = engine.arena.get(app_node) {
+                if let Ok(Node::App(_lhs, rhs)) = engine.arena.get(app_node) {
                     work_stack.push(*rhs);
                 }
             }
         }
+
+        Ok(())
     }
 }
 
@@ -193,7 +206,7 @@ pub struct WeakHeadNormalForm;
 
 impl Default for WeakHeadNormalForm {
     fn default() -> Self {
-        unreachable!("WeakHeadNormalForm default")
+        Self
     }
 }
 
@@ -201,23 +214,22 @@ impl Default for WeakHeadNormalForm {
 pub type WHNF = WeakHeadNormalForm;
 
 impl ReductionStrat for WeakHeadNormalForm {
-    fn perform(engine: &mut Engine, callback: &mut Option<impl FnMut(EngineView)>) {
+    fn perform(engine: &mut Engine, callback: &mut Option<impl FnMut(EngineView)>) -> Result<()> {
         let mut prev_reduction = ReductionState::Reduced;
 
         while prev_reduction == ReductionState::Reduced {
             let current = if let Some(&end) = engine.spine.last() {
-                match engine.arena.get(end) {
-                    Some(Node::App(lhs, _)) => *lhs,
-                    Some(_) => end,
-                    None => unreachable!(),
+                match engine.arena.get(end)? {
+                    Node::App(lhs, _) => *lhs,
+                    _ => end,
                 }
             } else {
                 engine.subtree_root
             };
 
-            engine.unwind(current);
+            engine.unwind(current)?;
 
-            prev_reduction = engine.reduce().expect("Reduction failure");
+            prev_reduction = engine.reduce()?;
 
             if let Some(f) = callback
                 && prev_reduction == ReductionState::Reduced
@@ -225,5 +237,7 @@ impl ReductionStrat for WeakHeadNormalForm {
                 f(EngineView::from_engine(engine));
             }
         }
+
+        Ok(())
     }
 }

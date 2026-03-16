@@ -1,93 +1,22 @@
 /*!
-A crate for several parsing related data structures and parsers.
+Parsers for lexor TODO: rewrite
 */
-
-pub mod combinator {
-    /*!
-    This module provides a definition for a [`Combinator`]. This is only used
-    for parsing.
-
-    TODO: Finish docs, add example
-    */
-
-    use core::fmt;
-    use std::ops::BitAnd;
-
-    /// Represents a SKI combinator term. Supports free variables, and the
-    /// following combinators: S, K, I, B, C
-    #[derive(Debug, Clone, PartialEq, Eq)]
-    pub enum Combinator {
-        S,
-        K,
-        I,
-        B,
-        C,
-        App(Box<Self>, Box<Self>),
-    }
-
-    // Application operator for ease of describing complex terms
-    impl BitAnd for Combinator {
-        type Output = Self;
-
-        fn bitand(self, rhs: Self) -> Self::Output {
-            Self::App(Box::new(self), Box::new(rhs))
-        }
-    }
-
-    impl fmt::Display for Combinator {
-        fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
-            match self {
-                Self::S => write!(f, "S"),
-                Self::K => write!(f, "K"),
-                Self::I => write!(f, "I"),
-                Self::B => write!(f, "B"),
-                Self::C => write!(f, "C"),
-                Self::App(lhs, rhs) if let Self::App(_, _) = **rhs => write!(f, "{lhs}({rhs})"),
-                Self::App(lhs, rhs) => write!(f, "{lhs}{rhs}"),
-            }
-        }
-    }
-}
-
-pub mod lambda {
-    /*!
-    This module provides a definition for a Lambda calculus term in the
-    standard representation. This is only used for parsing.
-
-    TODO: Finish docs, add example
-    */
-
-    use core::fmt;
-
-    /// Represents an untyped lambda calculus term (not using De Bruijn indexing).
-    #[derive(Clone, Debug, PartialEq, Eq)]
-    pub enum Lambda {
-        /// Variable
-        Var(String),
-        /// Abstraction
-        Abs(String, Box<Self>),
-        /// Application
-        App(Box<Self>, Box<Self>),
-    }
-
-    impl fmt::Display for Lambda {
-        fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
-            match self {
-                Self::Var(name) => write!(f, "{name}"),
-                Self::Abs(name, lambda_expr) => write!(f, "λ{name}.{lambda_expr}"),
-                Self::App(lhs, rhs) if let Self::App(_, _) = **rhs => write!(f, "({lhs})({rhs})"),
-                Self::App(lhs, rhs) => write!(f, "({lhs}){rhs}"),
-            }
-        }
-    }
-}
 
 pub mod ski_parser {
     /*!
-    This module provides a ski parser implemented with chumsky.
+    Parsers for lexor SKI TODO: rewrite
     */
-    use crate::combinator::Combinator;
     use chumsky::prelude::*;
+    use lexor_core::combinator::Combinator;
+    use thiserror::Error;
+
+    /// Parsing error
+    #[derive(Error, Debug, PartialEq, Eq)]
+    pub enum ParsingError {
+        /// Chumsky
+        #[error("Chumsky parsing error...")]
+        ChumskyError,
+    }
 
     ///
     /// # Errors
@@ -98,10 +27,8 @@ pub mod ski_parser {
     /// # Example
     ///
     /// ```
-    /// use lexor_parser::{
-    ///     combinator::Combinator,
-    ///     ski_parser::chumsky_parse as parse
-    /// };
+    /// use lexor_parser::ski_parser::chumsky_parse as parse;
+    /// use lexor_core::combinator::Combinator;
     ///
     /// let ski_term = "IKSKSSKISKSSSIK";
     /// let tree_root = parse(ski_term).unwrap();
@@ -134,9 +61,12 @@ pub mod ski_parser {
 }
 
 pub mod lambda_parser {
-    use crate::lambda::Lambda;
+    /*!
+    Parsers for lexor Lambda TODO: rewrite
+    */
     use chumsky::extra;
     use chumsky::prelude::*;
+    use lexor_core::lambda::Lambda;
 
     ///
     /// # Errors

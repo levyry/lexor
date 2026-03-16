@@ -64,7 +64,7 @@ impl eframe::App for MyApp {
                 let style = self
                     .tabs
                     .style
-                    .get_or_insert(Style::from_egui(ui.style()))
+                    .get_or_insert_with(|| Style::from_egui(ui.style()))
                     .clone();
 
                 // Display view
@@ -148,6 +148,7 @@ impl eframe::App for MyApp {
 }
 
 impl MyApp {
+    #[must_use]
     pub fn new(cc: &eframe::CreationContext<'_>) -> Self {
         if let Some(storage) = cc.storage
             && let Some(state) = eframe::get_value(storage, eframe::APP_KEY)

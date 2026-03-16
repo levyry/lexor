@@ -12,7 +12,7 @@ workspace = true
 lower = { workspace = true }
 slotmap = { workspace = true }
 arrayvec = { workspace = true }
-rootcause = { workspace = true }
+thiserror = { workspace = true }
 lexor-core = { workspace = true }
 lexor-parser = { workspace = true }
 

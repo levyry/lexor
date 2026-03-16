@@ -6,9 +6,9 @@ TODO: Finish docs, add example
 */
 
 #![allow(clippy::eq_op)]
+#![allow(unused)]
 
-use crate::de_bruijn::DeBruijn;
-use lexor_parser::combinator::Combinator;
+use lexor_core::{combinator::Combinator, de_bruijn::DeBruijn};
 use lower::saturating::math as saturating;
 use std::{
     cmp::Ordering,
@@ -18,6 +18,7 @@ use std::{
 };
 
 #[must_use]
+/// Kiselyov conversion. TODO: finish
 pub fn kiselyov(deb: &DeBruijn, mode: &BulkResolver) -> (usize, Combinator) {
     let (n, bulk) = convert(deb);
 
@@ -30,24 +31,36 @@ pub fn kiselyov(deb: &DeBruijn, mode: &BulkResolver) -> (usize, Combinator) {
     (n, result)
 }
 
+/// The kinds of Bulk combinator resolvers available.
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub enum BulkResolver {
+    /// Linear resolver
     Linear,
+    /// Logarithmic resolver
     Logarithmic,
 }
 
-// Internal combinator representation that supports bulk combinators
+/// Internal combinator representation that supports bulk combinators
 #[derive(Debug, Clone)]
 pub enum BulkCom {
-    App(Box<Self>, Box<Self>),
+    /// S
     S,
+    /// I
     I,
+    /// C
     C,
+    /// K
     K,
+    /// B
     B,
+    /// S bulk
     Sn(usize),
+    /// B bulk
     Bn(usize),
+    /// C bulk
     Cn(usize),
+    /// Application
+    App(Box<Self>, Box<Self>),
 }
 
 // Application operator for ease of describing complex terms
@@ -83,7 +96,7 @@ impl fmt::Display for BulkCom {
     }
 }
 
-pub(crate) fn convert(deb: &DeBruijn) -> (usize, BulkCom) {
+pub fn convert(deb: &DeBruijn) -> (usize, BulkCom) {
     match deb {
         DeBruijn::BVar(0) => (1, BulkCom::I),
         DeBruijn::BVar(n) => {
@@ -136,7 +149,7 @@ fn apply((lhs_num, lhs_body): (usize, BulkCom), (rhs_num, rhs_body): (usize, Bul
 }
 
 #[must_use]
-pub(crate) fn lin_bulk(bulk: &BulkCom) -> Combinator {
+pub fn lin_bulk(bulk: &BulkCom) -> Combinator {
     let mut result: Combinator;
 
     match *bulk {
@@ -169,7 +182,7 @@ pub(crate) fn lin_bulk(bulk: &BulkCom) -> Combinator {
     result
 }
 
-pub(crate) fn log_bulk(bulk: &BulkCom) -> Combinator {
+pub fn log_bulk(bulk: &BulkCom) -> Combinator {
     match *bulk {
         BulkCom::Bn(n) => go(n, Combinator::K & Combinator::I) & Combinator::B & Combinator::I,
         BulkCom::Cn(n) => {

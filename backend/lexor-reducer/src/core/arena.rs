@@ -1,32 +1,42 @@
 use crate::core::node::{Node, NodeComb, NodeKey};
-use lexor_parser::combinator::Combinator;
+use lexor_core::combinator::Combinator;
 use slotmap::SlotMap;
+use thiserror::Error;
+
+#[derive(Error, Debug, PartialEq, Eq)]
+pub enum ArenaError {
+    #[error("referenced key not in arena")]
+    MissingKey,
+    #[error("tried getting the argument of not a Node::App")]
+    MissingArg,
+}
+
+type Result<T> = core::result::Result<T, ArenaError>;
 
 #[derive(Debug, Clone)]
 pub struct Arena(SlotMap<NodeKey, Node>);
 
 impl Arena {
-    #[must_use] 
-    pub fn presized(size: usize) -> Self {
+    #[must_use]
+    pub(crate) fn presized(size: usize) -> Self {
         Self(SlotMap::with_capacity_and_key(size))
     }
 
-    pub fn replace(&mut self, key: NodeKey, replacement: Node) {
+    pub(crate) fn replace(&mut self, key: NodeKey, replacement: Node) {
         if let Some(current) = self.0.get_mut(key) {
             *current = replacement;
         }
     }
 
-    #[must_use] 
-    pub fn get_arg(&self, key: NodeKey) -> NodeKey {
+    pub(crate) fn get_arg(&self, key: NodeKey) -> Result<NodeKey> {
         match self.0.get(key) {
-            Some(Node::App(_, arg)) => *arg,
-            Some(_) => unreachable!("Called get_arg on not a Node::App"),
-            None => unreachable!("Missing key in get_arg"),
+            Some(Node::App(_, arg)) => Ok(*arg),
+            Some(_) => Err(ArenaError::MissingArg),
+            None => Err(ArenaError::MissingKey),
         }
     }
 
-    pub fn flatten(&mut self, ast: Combinator) -> NodeKey {
+    pub(crate) fn flatten(&mut self, ast: Combinator) -> NodeKey {
         match ast {
             Combinator::S => self.0.insert(Node::Comb(NodeComb::S)),
             Combinator::K => self.0.insert(Node::Comb(NodeComb::K)),
@@ -41,12 +51,11 @@ impl Arena {
         }
     }
 
-    #[must_use] 
-    pub fn get(&self, key: NodeKey) -> Option<&Node> {
-        self.0.get(key)
+    pub(crate) fn get(&self, key: NodeKey) -> Result<&Node> {
+        self.0.get(key).ok_or(ArenaError::MissingKey)
     }
 
-    pub fn insert(&mut self, value: Node) -> NodeKey {
+    pub(crate) fn insert(&mut self, value: Node) -> NodeKey {
         self.0.insert(value)
     }
 }

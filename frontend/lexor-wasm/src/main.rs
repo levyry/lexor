@@ -18,13 +18,18 @@ fn main() -> eframe::Result {
     eframe::run_native(
         "Lexor",
         native_options,
-        Box::new(|cc| Ok(Box::new(lexor_wasm::app::MyApp::new(cc)))),
+        Box::new(|cc| Ok(Box::new(lexor_wasm::app::LexorApp::new(cc)))),
     )
 }
 
 // When compiling to web using trunk:
 #[cfg(target_arch = "wasm32")]
 fn main() {
+    // Check if we are in the main thread or the Web Worker
+    if web_sys::window().is_none() {
+        return;
+    }
+
     use eframe::wasm_bindgen::JsCast as _;
 
     // Redirect `log` message to `console.log` and friends:
@@ -48,7 +53,7 @@ fn main() {
             .start(
                 canvas,
                 web_options,
-                Box::new(|cc| Ok(Box::new(lexor_wasm::app::MyApp::new(cc)))),
+                Box::new(|cc| Ok(Box::new(lexor_wasm::app::LexorApp::new(cc)))),
             )
             .await;
 

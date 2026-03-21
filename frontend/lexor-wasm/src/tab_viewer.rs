@@ -1,28 +1,29 @@
-use egui::{TopBottomPanel, Ui, WidgetText};
+use egui::{ScrollArea, TopBottomPanel, Ui, WidgetText};
 use egui_dock::{Style, TabViewer, tab_viewer::OnCloseResponse};
-use lexor_api::SourceID;
+use lexor_api::{NodeData, SourceID};
 use serde::{Deserialize, Serialize};
-use std::collections::HashMap;
+use std::{cell::RefCell, collections::HashMap, rc::Rc};
 
 use crate::{messages::AppMessage, tabs::AppTabs};
 
 #[derive(Clone, Default, Serialize, Deserialize)]
-pub struct AppTabViewer {
+pub struct LexorTabViewer {
     #[serde(skip)]
     pub style: Option<Style>,
 
     pub inputs: HashMap<SourceID, String>,
-    pub reduction_steps: HashMap<SourceID, String>,
+    pub reduction_steps: HashMap<SourceID, Vec<String>>,
+    pub reduction_graph: HashMap<SourceID, Vec<NodeData>>,
     pub last_assigned_key: SourceID,
 
     #[serde(skip)]
     pub last_edited_time: HashMap<SourceID, f64>,
 
     #[serde(skip)]
-    pub messages: Vec<AppMessage>,
+    pub messages: Rc<RefCell<Vec<AppMessage>>>,
 }
 
-impl TabViewer for AppTabViewer {
+impl TabViewer for LexorTabViewer {
     type Tab = AppTabs;
 
     fn title(&mut self, tab: &mut Self::Tab) -> WidgetText {
@@ -46,13 +47,15 @@ impl TabViewer for AppTabViewer {
 
     fn on_close(&mut self, tab: &mut Self::Tab) -> OnCloseResponse {
         if let AppTabs::SkiSource(id) = tab {
-            self.messages.push(AppMessage::CloseSourceTab(*id));
+            self.messages
+                .borrow_mut()
+                .push(AppMessage::CloseSourceTab(*id));
         }
         OnCloseResponse::Close
     }
 }
 
-impl AppTabViewer {
+impl LexorTabViewer {
     fn welcome_view(&self, ui: &mut Ui) {
         ui.heading("Welcome to Lexor!");
     }
@@ -65,11 +68,15 @@ impl AppTabViewer {
                 ui.horizontal(|ui| {
                     ui.menu_button("Add new...", |ui| {
                         if ui.button("Reduction Chain").clicked() {
-                            self.messages.push(AppMessage::RequestChainOutput(id));
+                            self.messages
+                                .borrow_mut()
+                                .push(AppMessage::RequestChainOutput(id));
                             ui.close_kind(egui::UiKind::Menu);
                         }
                         if ui.button("Reduction Graph").clicked() {
-                            self.messages.push(AppMessage::RequestGraphOutput(id));
+                            self.messages
+                                .borrow_mut()
+                                .push(AppMessage::RequestGraphOutput(id));
                             ui.close_kind(egui::UiKind::Menu);
                         }
                     });
@@ -91,7 +98,19 @@ impl AppTabViewer {
             .expect("Reduction steps not found");
 
         ui.vertical(|ui| {
-            ui.label(steps);
+            let text_style = egui::TextStyle::Body;
+            let row_height = ui.text_style_height(&text_style);
+
+            ScrollArea::vertical().show_rows(ui, row_height * 0.2, steps.len(), |ui, row_range| {
+                for row in row_range {
+                    let next = row.saturating_add(1);
+                    // SAFETY: Since we gave steps.len() to the function
+                    // above, we can never index out of bounds here.
+                    #[allow(clippy::indexing_slicing)]
+                    ui.label(format!("{}. {}", next, steps[row]));
+                }
+            });
+            ui.label("The result"); // TODO: fix
         });
     }
 
@@ -114,7 +133,7 @@ impl AppTabViewer {
     }
 
     pub fn new_reduction_output(&mut self, id: usize) -> AppTabs {
-        self.reduction_steps.insert(id, String::default());
+        self.reduction_steps.insert(id, vec![String::new()]);
         AppTabs::ReductionChain(id)
     }
 }

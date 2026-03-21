@@ -1,6 +1,5 @@
+use lexor_api::SourceID;
 use serde::{Deserialize, Serialize};
-
-pub type SourceID = usize;
 
 #[derive(Clone, Debug, PartialEq, Eq, Hash, Serialize, Deserialize)]
 pub enum SourceType {

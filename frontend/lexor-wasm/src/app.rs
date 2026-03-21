@@ -3,13 +3,14 @@
 use std::vec;
 
 use crate::{
-    messages::{AppMessage, SourceID, SourceType},
+    messages::{AppMessage, SourceType},
     settings::Settings,
     tab_viewer::AppTabViewer,
     tabs::AppTabs,
 };
 use egui::{CentralPanel, Frame, TopBottomPanel, Ui};
 use egui_dock::{DockArea, DockState, NodeIndex, Style};
+use lexor_api::SourceID;
 use lexor_reducer::ReductionStrat;
 use serde::{Deserialize, Serialize};
 

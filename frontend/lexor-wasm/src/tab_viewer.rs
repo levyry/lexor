@@ -1,12 +1,10 @@
 use egui::{TopBottomPanel, Ui, WidgetText};
 use egui_dock::{Style, TabViewer, tab_viewer::OnCloseResponse};
+use lexor_api::SourceID;
 use serde::{Deserialize, Serialize};
 use std::collections::HashMap;
 
-use crate::{
-    messages::{AppMessage, SourceID},
-    tabs::AppTabs,
-};
+use crate::{messages::AppMessage, tabs::AppTabs};
 
 #[derive(Clone, Default, Serialize, Deserialize)]
 pub struct AppTabViewer {

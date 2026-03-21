@@ -1,0 +1,14 @@
+[package]
+name = "lexor-api"
+edition.workspace = true
+version.workspace = true
+authors.workspace = true
+description.workspace = true
+
+[dependencies]
+lexor-reducer = { workspace = true }
+serde = { version = "1.0.228", features = ["derive"] }
+serde_json = { version = "1.0" }
+
+[lints]
+workspace = true

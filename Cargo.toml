@@ -5,6 +5,7 @@ members = [
     "./backend/lexor-core",
     "./backend/lexor-parser",
     "./backend/lexor-convert",
+    "./frontend/lexor-api",
     "./frontend/lexor-wasm",
 ]
 
@@ -17,6 +18,7 @@ arrayvec = "0.7.6"
 lexor-core = { path = "./backend/lexor-core", version = "*" }
 lexor-parser = { path = "./backend/lexor-parser", version = "*" }
 lexor-reducer = { path = "./backend/lexor-reducer", version = "*" }
+lexor-api = { path = "./frontend/lexor-api", version = "*" }
 
 [workspace.package]
 edition = "2024"

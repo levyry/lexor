@@ -1539,6 +1539,15 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "e2db585e1d738fc771bf08a151420d3ed193d9d895a36df7f6f8a9456b911ddc"
 
 [[package]]
+name = "lexor-api"
+version = "0.1.0"
+dependencies = [
+ "lexor-reducer",
+ "serde",
+ "serde_json",
+]
+
+[[package]]
 name = "lexor-convert"
 version = "0.1.0"
 dependencies = [
@@ -1584,6 +1593,7 @@ dependencies = [
  "egui",
  "egui_dock",
  "env_logger",
+ "lexor-api",
  "lexor-reducer",
  "log",
  "serde",

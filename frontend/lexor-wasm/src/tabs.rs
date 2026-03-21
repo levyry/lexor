@@ -1,6 +1,5 @@
+use lexor_api::SourceID;
 use serde::{Deserialize, Serialize};
-
-use crate::messages::SourceID;
 
 #[derive(Clone, Debug, PartialEq, Eq, Hash, Serialize, Deserialize)]
 pub enum AppTabs {

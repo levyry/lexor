@@ -8,7 +8,7 @@ pub struct LexorTabViewer<'a> {
     pub state: &'a mut AppState,
 }
 
-impl<'a> TabViewer for LexorTabViewer<'a> {
+impl TabViewer for LexorTabViewer<'_> {
     type Tab = AppTabs;
 
     fn title(&mut self, tab: &mut Self::Tab) -> WidgetText {
@@ -41,7 +41,7 @@ impl<'a> TabViewer for LexorTabViewer<'a> {
     }
 }
 
-impl<'a> LexorTabViewer<'a> {
+impl LexorTabViewer<'_> {
     fn welcome_view(&self, ui: &mut Ui) {
         ui.heading("Welcome to Lexor!");
     }

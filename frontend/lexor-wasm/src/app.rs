@@ -80,38 +80,16 @@ impl eframe::App for LexorApp {
     }
 
     fn update(&mut self, ctx: &egui::Context, _frame: &mut eframe::Frame) {
-        self.process_msg_queue(ctx);
-
-        // Draw scene
-        TopBottomPanel::top("egui_dock::MenuBar").show(ctx, |ui| {
-            egui::MenuBar::new().ui(ui, |ui| self.add_menubar(ui))
-        });
-
-        CentralPanel::default()
-            .frame(Frame::central_panel(&ctx.style()).inner_margin(0.))
-            .show(ctx, |ui| {
-                let style = self
-                    .state
-                    .style
-                    .get_or_insert_with(|| Style::from_egui(ui.style()))
-                    .clone();
-
-                let mut tab_viewer = LexorTabViewer {
-                    state: &mut self.state,
-                };
-
-                // Display view
-                DockArea::new(&mut self.tree)
-                    .style(style)
-                    .show_inside(ui, &mut tab_viewer);
-            });
+        self.handle_debouncers(ctx);
+        self.process_message_queue();
+        self.draw_canvas(ctx);
     }
 }
 
 impl LexorApp {
     #[must_use]
     pub fn new(cc: &eframe::CreationContext<'_>) -> Self {
-        let mut app: LexorApp = if let Some(storage) = cc.storage
+        let mut app: Self = if let Some(storage) = cc.storage
             && let Some(state) = eframe::get_value(storage, eframe::APP_KEY)
         {
             state
@@ -182,119 +160,145 @@ impl LexorApp {
         }
     }
 
-    fn process_msg_queue(&mut self, ctx: &egui::Context) {
-        // Debouncer logic
+    fn process_message_queue(&mut self) {
+        // Handle the message queue
+        self.state
+            .messages
+            .take()
+            .into_iter()
+            .for_each(|msg| self.apply_message(msg));
+    }
+
+    fn apply_message(&mut self, msg: AppMessage) {
+        match msg {
+            AppMessage::RequestNewSource(SourceType::Ski) => {
+                let tab = self.state.new_ski_source();
+                self.spawn_tab(tab);
+            }
+            AppMessage::RequestNewSource(SourceType::Lambda) => {
+                todo!()
+            }
+            AppMessage::RequestChainOutput(source_id) => {
+                let tab = self.state.new_reduction_output(source_id);
+                self.spawn_tab(tab);
+            }
+            AppMessage::SendReductionJob(source_id) => {
+                let input = self
+                    .state
+                    .inputs
+                    .get(&source_id)
+                    .expect("SourceID not found while trying to run reduction");
+
+                let wants_steps = self.tree.iter_all_tabs().any(|tab| {
+                    if let AppTabs::ReductionChain(inner_id) = tab.1
+                        && source_id == *inner_id
+                    {
+                        true
+                    } else {
+                        false
+                    }
+                });
+
+                let wants_graph = self.tree.iter_all_tabs().any(|tab| {
+                    if let AppTabs::ReductionGraph(inner_id) = tab.1
+                        && source_id == *inner_id
+                    {
+                        true
+                    } else {
+                        false
+                    }
+                });
+
+                let request = WorkerRequest {
+                    source_id,
+                    code: input.clone(),
+                    wants_steps,
+                    wants_graph,
+                };
+
+                let json = serde_json::to_string(&request)
+                    .expect("Failed to serialize into JSON when sending request");
+                self.worker
+                    .post_message(&json.into())
+                    .expect("Worker returned Err");
+
+                // Set loading screen while waiting
+                if wants_steps {
+                    self.state
+                        .reduction_steps
+                        .insert(source_id, vec!["Loading...".to_owned()]);
+                }
+            }
+            AppMessage::CloseSourceTab(source_id) => {
+                self.tree.retain_tabs(|tab| match tab {
+                    AppTabs::ReductionChain(out_id) => *out_id != source_id,
+                    _ => true,
+                });
+                self.state.inputs.remove(&source_id);
+                self.state.reduction_steps.remove(&source_id);
+                self.state.last_assigned_key = *self.state.inputs.keys().max().unwrap_or(&0usize);
+            }
+            AppMessage::RequestGraphOutput(_source_id) => todo!(),
+            AppMessage::WorkerJobCompleted(worker_response) => {
+                if let Some(steps) = worker_response.steps {
+                    self.state
+                        .reduction_steps
+                        .insert(worker_response.source_id, steps);
+                }
+
+                if let Some(graph) = worker_response.graph_nodes {
+                    self.state
+                        .reduction_graph
+                        .insert(worker_response.source_id, graph);
+                }
+            }
+        }
+    }
+
+    fn handle_debouncers(&mut self, ctx: &egui::Context) {
         let current_time = ctx.input(|i| i.time);
         let debounce_delay = 0.5;
+        let mut to_recompile = Vec::new();
 
-        // Find all tabs that need to be recompiled and push the
-        // message to run the reduction on them
-        let recompiled_tabs: Vec<SourceID> = self
-            .state
-            .last_edited_time
-            .iter()
-            .filter(|&(_id, last_time)| current_time - last_time > debounce_delay)
-            .map(|(&id, _)| id)
-            .collect();
-
-        for id in recompiled_tabs {
-            self.state.last_edited_time.remove(&id);
-            if self.state.inputs.contains_key(&id) {
-                self.state
-                    .messages
-                    .borrow_mut()
-                    .push(AppMessage::SendReductionJob(id));
+        self.state.last_edited_time.retain(|&id, &mut last_time| {
+            if current_time - last_time > debounce_delay {
+                to_recompile.push(id);
+                false
+            } else {
+                true
             }
+        });
+
+        for id in to_recompile {
+            self.state
+                .messages
+                .borrow_mut()
+                .push(AppMessage::SendReductionJob(id));
         }
+    }
 
-        // Handle the message queue
-        let pending = self.state.messages.take();
+    fn draw_canvas(&mut self, ctx: &egui::Context) {
+        TopBottomPanel::top("egui_dock::MenuBar").show(ctx, |ui| {
+            egui::MenuBar::new().ui(ui, |ui| self.add_menubar(ui))
+        });
 
-        for msg in pending {
-            match msg {
-                AppMessage::RequestNewSource(SourceType::Ski) => {
-                    let tab = self.state.new_ski_source();
-                    self.spawn_tab(tab);
-                }
-                AppMessage::RequestNewSource(SourceType::Lambda) => {
-                    todo!()
-                }
-                AppMessage::RequestChainOutput(source_id) => {
-                    let tab = self.state.new_reduction_output(source_id);
-                    self.spawn_tab(tab);
-                }
-                AppMessage::SendReductionJob(source_id) => {
-                    let input = self
-                        .state
-                        .inputs
-                        .get(&source_id)
-                        .expect("SourceID not found while trying to run reduction");
+        CentralPanel::default()
+            .frame(Frame::central_panel(&ctx.style()).inner_margin(0.))
+            .show(ctx, |ui| {
+                let style = self
+                    .state
+                    .style
+                    .get_or_insert_with(|| Style::from_egui(ui.style()))
+                    .clone();
 
-                    let wants_steps = self.tree.iter_all_tabs().any(|tab| {
-                        if let AppTabs::ReductionChain(inner_id) = tab.1
-                            && source_id == *inner_id
-                        {
-                            true
-                        } else {
-                            false
-                        }
-                    });
+                let mut tab_viewer = LexorTabViewer {
+                    state: &mut self.state,
+                };
 
-                    let wants_graph = self.tree.iter_all_tabs().any(|tab| {
-                        if let AppTabs::ReductionGraph(inner_id) = tab.1
-                            && source_id == *inner_id
-                        {
-                            true
-                        } else {
-                            false
-                        }
-                    });
-
-                    let request = WorkerRequest {
-                        source_id,
-                        code: input.clone(),
-                        wants_steps,
-                        wants_graph,
-                    };
-
-                    let json = serde_json::to_string(&request)
-                        .expect("Failed to serialize into JSON when sending request");
-                    self.worker
-                        .post_message(&json.into())
-                        .expect("Worker returned Err");
-
-                    // Set loading screen while waiting
-                    if wants_steps {
-                        self.state
-                            .reduction_steps
-                            .insert(source_id, vec!["Loading...".to_owned()]);
-                    }
-                }
-                AppMessage::CloseSourceTab(source_id) => {
-                    self.tree.retain_tabs(|tab| match tab {
-                        AppTabs::ReductionChain(out_id) => *out_id != source_id,
-                        _ => true,
-                    });
-                    self.state.inputs.remove(&source_id);
-                    self.state.reduction_steps.remove(&source_id);
-                    self.state.last_assigned_key =
-                        *self.state.inputs.keys().max().unwrap_or(&0usize);
-                }
-                AppMessage::RequestGraphOutput(_source_id) => todo!(),
-                AppMessage::WorkerJobCompleted(worker_response) => {
-                    if let Some(steps) = worker_response.steps {
-                        self.state
-                            .reduction_steps
-                            .insert(worker_response.source_id, steps);
-                    }
-
-                    if let Some(graph) = worker_response.graph_nodes {
-                        self.state
-                            .reduction_graph
-                            .insert(worker_response.source_id, graph);
-                    }
-                }
-            }
-        }
+                // Display view
+                DockArea::new(&mut self.tree)
+                    .style(style)
+                    .show_inside(ui, &mut tab_viewer);
+            });
     }
 }

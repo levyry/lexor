@@ -8,12 +8,12 @@ use crate::{
     state::AppState,
     tab_viewer::LexorTabViewer,
     tabs::AppTabs,
+    worker_bridge::WorkerBridge,
 };
 use egui::{CentralPanel, Frame, TopBottomPanel, Ui};
 use egui_dock::{DockArea, DockState, NodeIndex, Style};
-use lexor_api::{SourceID, WorkerRequest, WorkerResponse};
+use lexor_api::WorkerRequest;
 use serde::{Deserialize, Serialize};
-use wasm_bindgen::{JsCast, prelude::Closure};
 
 #[derive(Serialize, Deserialize)]
 #[serde(default)]
@@ -22,7 +22,7 @@ pub struct LexorApp {
     settings: Settings,
     tree: DockState<AppTabs>,
     #[serde(skip)]
-    worker: web_sys::Worker,
+    worker: WorkerBridge,
 }
 
 impl Default for LexorApp {
@@ -45,23 +45,7 @@ impl Default for LexorApp {
             .split_right(ski_node, 0.5, vec![reduction_tab]);
 
         let message_queue = Rc::new(RefCell::new(Vec::new()));
-        let worker = web_sys::Worker::new("worker.js").expect("Failed to create Web Worker");
-
-        let callback_queue = Rc::clone(&message_queue);
-
-        #[allow(clippy::as_conversions)]
-        let callback = Closure::wrap(Box::new(move |event: web_sys::MessageEvent| {
-            if let Some(json_str) = event.data().as_string() {
-                let response: WorkerResponse = serde_json::from_str(&json_str)
-                    .expect("Failed to deserialize response in closure");
-                callback_queue
-                    .borrow_mut()
-                    .push(AppMessage::WorkerJobCompleted(response));
-            }
-        }) as Box<dyn FnMut(_)>);
-
-        worker.set_onmessage(Some(callback.as_ref().unchecked_ref()));
-        callback.forget(); // Keep callback alive
+        let worker = WorkerBridge::new(message_queue.clone());
 
         state.messages = message_queue;
 
@@ -89,43 +73,13 @@ impl eframe::App for LexorApp {
 impl LexorApp {
     #[must_use]
     pub fn new(cc: &eframe::CreationContext<'_>) -> Self {
-        let mut app: Self = if let Some(storage) = cc.storage
+        if let Some(storage) = cc.storage
             && let Some(state) = eframe::get_value(storage, eframe::APP_KEY)
         {
             state
         } else {
             Self::default()
-        };
-
-        let message_queue = Rc::new(RefCell::new(Vec::new()));
-
-        let options = web_sys::WorkerOptions::new();
-        options.set_type(web_sys::WorkerType::Module);
-
-        let worker = web_sys::Worker::new_with_options("worker.js", &options)
-            .expect("Failed to create Web Worker");
-
-        let callback_queue = Rc::clone(&message_queue);
-
-        #[allow(clippy::as_conversions)]
-        let callback = Closure::wrap(Box::new(move |event: web_sys::MessageEvent| {
-            if let Some(json_str) = event.data().as_string() {
-                let response: WorkerResponse = serde_json::from_str(&json_str)
-                    .expect("Failed to deserialize response in closure");
-                callback_queue
-                    .borrow_mut()
-                    .push(AppMessage::WorkerJobCompleted(response));
-            }
-        }) as Box<dyn FnMut(_)>);
-
-        worker.set_onmessage(Some(callback.as_ref().unchecked_ref()));
-        callback.forget();
-
-        // 3. Connect them back to the app!
-        app.worker = worker;
-        app.state.messages = message_queue;
-
-        app
+        }
     }
 
     fn add_menubar(&self, ui: &mut Ui) {
@@ -216,11 +170,7 @@ impl LexorApp {
                     wants_graph,
                 };
 
-                let json = serde_json::to_string(&request)
-                    .expect("Failed to serialize into JSON when sending request");
-                self.worker
-                    .post_message(&json.into())
-                    .expect("Worker returned Err");
+                self.worker.send_job(&request);
 
                 // Set loading screen while waiting
                 if wants_steps {

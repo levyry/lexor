@@ -1,6 +1,7 @@
 pub mod app;
 pub mod messages;
 pub mod settings;
+pub mod state;
 pub mod tab_viewer;
 pub mod tabs;
 

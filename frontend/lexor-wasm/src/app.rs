@@ -5,6 +5,7 @@ use std::{cell::RefCell, rc::Rc, vec};
 use crate::{
     messages::{AppMessage, SourceType},
     settings::Settings,
+    state::AppState,
     tab_viewer::LexorTabViewer,
     tabs::AppTabs,
 };
@@ -17,7 +18,7 @@ use wasm_bindgen::{JsCast, prelude::Closure};
 #[derive(Serialize, Deserialize)]
 #[serde(default)]
 pub struct LexorApp {
-    tabs: LexorTabViewer,
+    state: AppState,
     settings: Settings,
     tree: DockState<AppTabs>,
     #[serde(skip)]
@@ -26,12 +27,12 @@ pub struct LexorApp {
 
 impl Default for LexorApp {
     fn default() -> Self {
-        let mut tabs = LexorTabViewer::default();
-        let ski_tab = tabs.new_ski_source();
+        let mut state = AppState::default();
+        let ski_tab = state.new_ski_source();
         let AppTabs::SkiSource(id) = ski_tab else {
             unreachable!()
         };
-        let reduction_tab = tabs.new_reduction_output(id);
+        let reduction_tab = state.new_reduction_output(id);
 
         let mut tree = DockState::new(vec![AppTabs::Welcome]);
 
@@ -62,11 +63,11 @@ impl Default for LexorApp {
         worker.set_onmessage(Some(callback.as_ref().unchecked_ref()));
         callback.forget(); // Keep callback alive
 
-        tabs.messages = message_queue;
+        state.messages = message_queue;
 
         Self {
+            state,
             tree,
-            tabs,
             worker,
             settings: Settings::default(),
         }
@@ -90,15 +91,19 @@ impl eframe::App for LexorApp {
             .frame(Frame::central_panel(&ctx.style()).inner_margin(0.))
             .show(ctx, |ui| {
                 let style = self
-                    .tabs
+                    .state
                     .style
                     .get_or_insert_with(|| Style::from_egui(ui.style()))
                     .clone();
 
+                let mut tab_viewer = LexorTabViewer {
+                    state: &mut self.state,
+                };
+
                 // Display view
                 DockArea::new(&mut self.tree)
                     .style(style)
-                    .show_inside(ui, &mut self.tabs);
+                    .show_inside(ui, &mut tab_viewer);
             });
     }
 }
@@ -140,7 +145,7 @@ impl LexorApp {
 
         // 3. Connect them back to the app!
         app.worker = worker;
-        app.tabs.messages = message_queue;
+        app.state.messages = message_queue;
 
         app
     }
@@ -148,7 +153,7 @@ impl LexorApp {
     fn add_menubar(&self, ui: &mut Ui) {
         ui.menu_button("Add", |ui| {
             if ui.button("SKI source").clicked() {
-                self.tabs
+                self.state
                     .messages
                     .borrow_mut()
                     .push(AppMessage::RequestNewSource(SourceType::Ski));
@@ -185,7 +190,7 @@ impl LexorApp {
         // Find all tabs that need to be recompiled and push the
         // message to run the reduction on them
         let recompiled_tabs: Vec<SourceID> = self
-            .tabs
+            .state
             .last_edited_time
             .iter()
             .filter(|&(_id, last_time)| current_time - last_time > debounce_delay)
@@ -193,9 +198,9 @@ impl LexorApp {
             .collect();
 
         for id in recompiled_tabs {
-            self.tabs.last_edited_time.remove(&id);
-            if self.tabs.inputs.contains_key(&id) {
-                self.tabs
+            self.state.last_edited_time.remove(&id);
+            if self.state.inputs.contains_key(&id) {
+                self.state
                     .messages
                     .borrow_mut()
                     .push(AppMessage::SendReductionJob(id));
@@ -203,24 +208,24 @@ impl LexorApp {
         }
 
         // Handle the message queue
-        let pending = self.tabs.messages.take();
+        let pending = self.state.messages.take();
 
         for msg in pending {
             match msg {
                 AppMessage::RequestNewSource(SourceType::Ski) => {
-                    let tab = self.tabs.new_ski_source();
+                    let tab = self.state.new_ski_source();
                     self.spawn_tab(tab);
                 }
                 AppMessage::RequestNewSource(SourceType::Lambda) => {
                     todo!()
                 }
                 AppMessage::RequestChainOutput(source_id) => {
-                    let tab = self.tabs.new_reduction_output(source_id);
+                    let tab = self.state.new_reduction_output(source_id);
                     self.spawn_tab(tab);
                 }
                 AppMessage::SendReductionJob(source_id) => {
                     let input = self
-                        .tabs
+                        .state
                         .inputs
                         .get(&source_id)
                         .expect("SourceID not found while trying to run reduction");
@@ -260,7 +265,7 @@ impl LexorApp {
 
                     // Set loading screen while waiting
                     if wants_steps {
-                        self.tabs
+                        self.state
                             .reduction_steps
                             .insert(source_id, vec!["Loading...".to_owned()]);
                     }
@@ -270,20 +275,21 @@ impl LexorApp {
                         AppTabs::ReductionChain(out_id) => *out_id != source_id,
                         _ => true,
                     });
-                    self.tabs.inputs.remove(&source_id);
-                    self.tabs.reduction_steps.remove(&source_id);
-                    self.tabs.last_assigned_key = *self.tabs.inputs.keys().max().unwrap_or(&0usize);
+                    self.state.inputs.remove(&source_id);
+                    self.state.reduction_steps.remove(&source_id);
+                    self.state.last_assigned_key =
+                        *self.state.inputs.keys().max().unwrap_or(&0usize);
                 }
                 AppMessage::RequestGraphOutput(_source_id) => todo!(),
                 AppMessage::WorkerJobCompleted(worker_response) => {
                     if let Some(steps) = worker_response.steps {
-                        self.tabs
+                        self.state
                             .reduction_steps
                             .insert(worker_response.source_id, steps);
                     }
 
                     if let Some(graph) = worker_response.graph_nodes {
-                        self.tabs
+                        self.state
                             .reduction_graph
                             .insert(worker_response.source_id, graph);
                     }

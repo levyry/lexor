@@ -7,6 +7,8 @@
 - probably a single crate like "lexor-wasm" or "combinator-explorer"
 - [egui](https://github.com/emilk/egui) with [egui dock](https://github.com/anhosh/egui_dock) to mimic [GoldenLayout](https://golden-layout.com/)
 - for drawing the AST, use [egui_graphs](https://github.com/blitzarx1/egui_graphs?tab=readme-ov-file). look into maybe implementing a Reingold-Tilford layout algorithm for a "neater" AST look
+- if i want progressive streaming on longer reductions, [egui_infinite_scroll](https://docs.rs/crate/egui_infinite_scroll/0.9.0/source/examples/infinite_scroll_async.rs) seems very useful for that
+  - probably send over a `reporting_frequency` in the request, and count the reductions in the closure. after `reporting_frequency` amount of reductions, return the current batch _somehow_...
 - look and feel similar to [regex101](https://regex101.com/) and [compiler explorer](https://godbolt.org/)
 - WASM target
 - generate recursive diagrams showing applied combinator and it's operands at each reduction step

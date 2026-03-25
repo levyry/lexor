@@ -12,7 +12,7 @@ use crate::{
 };
 use egui::{CentralPanel, Frame, TopBottomPanel, Ui};
 use egui_dock::{DockArea, DockState, NodeIndex, Style};
-use lexor_api::WorkerRequest;
+use lexor_api::{SourceID, WorkerRequest};
 use serde::{Deserialize, Serialize};
 
 #[derive(Serialize, Deserialize)]
@@ -143,25 +143,8 @@ impl LexorApp {
                     .get(&source_id)
                     .expect("SourceID not found while trying to run reduction");
 
-                let wants_steps = self.tree.iter_all_tabs().any(|tab| {
-                    if let AppTabs::ReductionChain(inner_id) = tab.1
-                        && source_id == *inner_id
-                    {
-                        true
-                    } else {
-                        false
-                    }
-                });
-
-                let wants_graph = self.tree.iter_all_tabs().any(|tab| {
-                    if let AppTabs::ReductionGraph(inner_id) = tab.1
-                        && source_id == *inner_id
-                    {
-                        true
-                    } else {
-                        false
-                    }
-                });
+                let wants_steps = self.is_steps_open_for(source_id);
+                let wants_graph = self.is_graph_open_for(source_id);
 
                 let request = WorkerRequest {
                     source_id,
@@ -173,6 +156,7 @@ impl LexorApp {
                 self.worker.send_job(&request);
 
                 // Set loading screen while waiting
+                // TODO: Refactor into something cleaner later
                 if wants_steps {
                     self.state
                         .reduction_steps
@@ -203,6 +187,18 @@ impl LexorApp {
                 }
             }
         }
+    }
+
+    fn is_steps_open_for(&self, source_id: SourceID) -> bool {
+        self.tree.iter_all_tabs().any(
+            |(_, tab)| matches!(tab, AppTabs::ReductionChain(inner_id) if source_id == *inner_id),
+        )
+    }
+
+    fn is_graph_open_for(&self, source_id: SourceID) -> bool {
+        self.tree.iter_all_tabs().any(
+            |(_, tab)| matches!(tab, AppTabs::ReductionGraph(inner_id) if source_id == *inner_id),
+        )
     }
 
     fn handle_debouncers(&mut self, ctx: &egui::Context) {

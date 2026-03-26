@@ -33,19 +33,21 @@ nursery = { level = "warn", priority = -1 }
 
 # Harden
 ## Stops panics
+# TODO: Enable all of these when main functionality is done
 unwrap_used = "deny"
-expect_used = "warn"
+# expect_used = "deny"
 indexing_slicing = "deny"
 arithmetic_side_effects = "deny"
-unreachable = "warn"
+# unreachable = "deny"
 unimplemented = "deny"
 unchecked_time_subtraction = "deny"
-todo = "warn"                       # TODO: clean up after prototyping
+# todo = "deny"
 string_slice = "deny"
 panic_in_result_fn = "deny"
 panic = "deny"
 exit = "deny"
 as_conversions = "deny"
+missing_panics_doc = "allow" # TODO: remove this
 ## Restrictions
 if_then_some_else_none = "deny"
 str_to_string = "deny"

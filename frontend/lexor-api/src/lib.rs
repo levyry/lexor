@@ -21,6 +21,7 @@ pub struct WorkerResponse {
     pub graph_nodes: Option<Vec<NodeData>>,
 }
 
+#[must_use]
 pub fn process_job(req_json: &str) -> String {
     let req: WorkerRequest = serde_json::from_str(req_json).expect("Invalid JSON recieved");
 

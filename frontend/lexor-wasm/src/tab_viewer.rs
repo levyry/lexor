@@ -44,6 +44,7 @@ impl TabViewer for LexorTabViewer<'_> {
 impl LexorTabViewer<'_> {
     fn welcome_view(&self, ui: &mut Ui) {
         ui.heading("Welcome to Lexor!");
+        ui.label("Lexor is a compiler and VM for lambda calculus targeting combinators. It provides intuitive visualizations for reduction rules and abstract syntax trees. For a list of full capabilities, check out the Help page.");
     }
 
     fn ski_source_view(&mut self, ui: &mut Ui, id: SourceID) {

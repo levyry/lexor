@@ -14,7 +14,7 @@ pub struct AppState {
     pub last_edited_time: HashMap<SourceID, f64>,
     pub last_assigned_key: usize,
 
-    pub style: Option<Style>,
+    pub style: AppStyle,
 
     #[serde(skip)]
     pub messages: Rc<RefCell<Vec<AppMessage>>>,

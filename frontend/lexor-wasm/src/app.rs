@@ -70,6 +70,7 @@ impl eframe::App for LexorApp {
         }
         self.handle_debouncers(ctx);
         self.process_message_queue();
+        self.set_theme(ctx);
         self.draw_canvas(ctx);
     }
 }
@@ -230,6 +231,12 @@ impl LexorApp {
                 .messages
                 .borrow_mut()
                 .push(AppMessage::SendReductionJob(id));
+        }
+    }
+
+    fn set_theme(&self, ctx: &egui::Context) {
+        match self.state.style {
+            // Catpuccin, Gruvbox, Compiler Explorer
         }
     }
 

@@ -1,4 +1,4 @@
-use lexor_reducer::{NF, ReductionStrat, WHNF};
+use lexor_reducer::{ReductionStrat, NF, WHNF};
 use rootcause::Report;
 
 #[test]

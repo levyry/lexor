@@ -99,11 +99,15 @@ pub trait ReductionStrat:
     /// # Errors
     ///
     /// If the provided `input` cannot be parsed as a SKI expression.
-    fn reduce_with(input: &str, callback: impl FnMut(EngineView)) -> Result<String> {
+    fn reduce_with(input: &str, mut callback: impl FnMut(EngineView)) -> Result<String> {
         let root = parse(input).map_err(|_| ChumskyError)?;
-
         let mut engine = Engine::from_tree(root);
-        Self::perform(&mut engine, &mut Some(callback))?;
+
+        Self::perform(&mut engine, &mut Some(&mut callback))?;
+
+        engine.spine.clear();
+        callback(EngineView::from_engine(&engine));
+
         Ok(format!("{}", EngineView::from_engine(&engine)))
     }
 
@@ -150,11 +154,15 @@ pub trait ReductionStrat:
     /// # Errors
     ///
     /// If the provided `input` cannot be parsed as a SKI expression.
-    fn compute_with(input: &str, callback: impl FnMut(EngineView)) -> Result<()> {
+    fn compute_with(input: &str, mut callback: impl FnMut(EngineView)) -> Result<()> {
         let root = parse(input).map_err(|_| ChumskyError)?;
-
         let mut engine = Engine::from_tree(root);
-        Self::perform(&mut engine, &mut Some(callback))?;
+
+        Self::perform(&mut engine, &mut Some(&mut callback))?;
+
+        engine.spine.clear();
+        callback(EngineView::from_engine(&engine));
+
         Ok(())
     }
 }
@@ -229,15 +237,30 @@ impl ReductionStrat for WeakHeadNormalForm {
 
             engine.unwind(current)?;
 
-            prev_reduction = engine.reduce()?;
+            let is_reducible = if let Some(&head_key) = engine.spine.last() {
+                if let Ok(Node::Comb(comb)) = engine.arena.get(head_key) {
+                    engine.spine.len() > comb.arity()
+                } else {
+                    false
+                }
+            } else {
+                false
+            };
 
-            if let Some(f) = callback
-                && prev_reduction == ReductionState::Reduced
-            {
+            if is_reducible && let Some(f) = callback {
                 f(EngineView::from_engine(engine));
             }
+
+            prev_reduction = engine.reduce()?;
         }
 
         Ok(())
     }
+}
+
+#[test]
+fn playground() {
+    let _ = NF::compute_with("SKSIKSISKS", |view| {
+        println!("{view}");
+    });
 }

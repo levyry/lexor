@@ -115,7 +115,6 @@ impl LexorApp {
     }
 
     fn process_message_queue(&mut self) {
-        // Handle the message queue
         self.state
             .messages
             .take()

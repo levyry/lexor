@@ -12,7 +12,7 @@ use crate::{
 };
 use egui::{CentralPanel, Frame, TopBottomPanel, Ui};
 use egui_dock::{DockArea, DockState, NodeIndex, Style};
-use lexor_api::{SourceID, WorkerRequest};
+use lexor_api::{SourceID, WorkerRequest, visual::RenderToken};
 use serde::{Deserialize, Serialize};
 
 #[derive(Serialize, Deserialize)]
@@ -157,9 +157,14 @@ impl LexorApp {
                 // Set loading screen while waiting
                 // TODO: Refactor into something cleaner later
                 if wants_steps {
-                    self.state
-                        .reduction_steps
-                        .insert(source_id, vec!["Loading...".to_owned()]);
+                    self.state.reduction_steps.insert(
+                        source_id,
+                        vec![vec![RenderToken {
+                            text: "Loading...".to_owned(),
+                            style: lexor_api::visual::TokenStyle::Normal,
+                            node_key: None,
+                        }]],
+                    );
                 }
             }
             AppMessage::CloseSourceTab(source_id) => {

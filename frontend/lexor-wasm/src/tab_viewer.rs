@@ -1,6 +1,9 @@
-use egui::{ScrollArea, TopBottomPanel, Ui, WidgetText};
+use egui::{TopBottomPanel, Ui, WidgetText};
 use egui_dock::{TabViewer, tab_viewer::OnCloseResponse};
-use lexor_api::SourceID;
+use lexor_api::{
+    SourceID,
+    visual::{RenderToken, TokenStyle, VisualComb},
+};
 
 use crate::{messages::AppMessage, state::AppState, tabs::AppTabs};
 
@@ -52,7 +55,7 @@ impl LexorTabViewer<'_> {
             let panel_id = egui::Id::new("source_top_panel").with(id);
 
             TopBottomPanel::top(panel_id).show_inside(ui, |ui| {
-                ui.horizontal(|ui| {
+                ui.horizontal_top(|ui| {
                     ui.menu_button("Add new...", |ui| {
                         if ui.button("Reduction Chain").clicked() {
                             self.state
@@ -86,26 +89,166 @@ impl LexorTabViewer<'_> {
             .reduction_steps
             .get(&source_id)
             .expect("Reduction steps not found");
+        let row_height = 20.0;
 
-        ui.vertical(|ui| {
-            let text_style = egui::TextStyle::Body;
-            let row_height = ui.text_style_height(&text_style);
+        egui::ScrollArea::vertical()
+            .auto_shrink([false, false])
+            .show_rows(ui, row_height, steps.len(), |ui, row_range| {
+                for index in row_range {
+                    let step = steps.get(index).expect(
+                        "We gave steps.len() in show_rows, so this should stay in bounds always.",
+                    );
 
-            ScrollArea::vertical().show_rows(ui, row_height * 0.2, steps.len(), |ui, row_range| {
-                for row in row_range {
-                    let next = row.saturating_add(1);
-                    // SAFETY: Since we gave steps.len() to the function
-                    // above, we can never index out of bounds here.
-                    #[allow(clippy::indexing_slicing)]
-                    ui.label(format!("{}. {}", next, steps[row]));
+                    let next_index = index.saturating_add(1);
+
+                    ui.horizontal(|ui| {
+                        ui.add(egui::Label::new(
+                            egui::RichText::new(format!("{next_index:3}."))
+                                .monospace()
+                                .color(egui::Color32::DARK_GRAY),
+                        ));
+
+                        LexorTabViewer::render_steps(ui, step);
+                    });
                 }
             });
-            ui.label("The result"); // TODO: fix
-        });
     }
 
     #[expect(unused)]
     pub fn reduction_graph_view(&self, ui: &mut Ui, source_id: SourceID) {
         todo!()
+    }
+
+    const fn get_redex_colors(comb: VisualComb) -> (egui::Color32, egui::Color32, egui::Color32) {
+        match comb {
+            VisualComb::S => (
+                // Red
+                egui::Color32::from_rgb(150, 50, 50),
+                egui::Color32::from_rgb(50, 20, 20),
+                egui::Color32::from_rgb(255, 100, 100),
+            ),
+            VisualComb::K => (
+                // Blue
+                egui::Color32::from_rgb(50, 100, 150),
+                egui::Color32::from_rgb(20, 40, 60),
+                egui::Color32::from_rgb(100, 150, 255),
+            ),
+            VisualComb::I => (
+                // Green
+                egui::Color32::from_rgb(50, 150, 50),
+                egui::Color32::from_rgb(20, 60, 20),
+                egui::Color32::from_rgb(100, 255, 100),
+            ),
+            VisualComb::B => (
+                // Orange
+                egui::Color32::from_rgb(150, 100, 50),
+                egui::Color32::from_rgb(60, 40, 20),
+                egui::Color32::from_rgb(255, 180, 100),
+            ),
+            VisualComb::C => (
+                // Purple
+                egui::Color32::from_rgb(150, 50, 150),
+                egui::Color32::from_rgb(60, 20, 60),
+                egui::Color32::from_rgb(255, 100, 255),
+            ),
+        }
+    }
+
+    // SAFETY: The if conditions check for tokens.len(), so it should
+    //         stay bounded. Same reasoning can show that the arithmetic
+    //         expression will never underflow.
+    #[expect(clippy::arithmetic_side_effects)]
+    #[expect(clippy::indexing_slicing)]
+    fn render_steps(ui: &mut egui::Ui, tokens: &[RenderToken]) {
+        let font_size = 12.0;
+        let max_tokens_to_render = 300;
+
+        let (display_tokens, truncated_count) = if tokens.len() > max_tokens_to_render {
+            (
+                &tokens[..max_tokens_to_render],
+                tokens.len() - max_tokens_to_render,
+            )
+        } else {
+            (tokens, 0)
+        };
+
+        ui.horizontal(|ui| {
+            ui.spacing_mut().item_spacing.x = 2.0;
+            ui.spacing_mut().item_spacing.y = 4.0;
+
+            for chunk in display_tokens.chunk_by(|a, b| a.style == b.style) {
+                let style = &chunk[0].style;
+                let text: String = chunk.iter().map(|t| t.text.as_str()).collect();
+                let node_key = chunk[0].node_key;
+
+                let response = match style {
+                    TokenStyle::Normal => {
+                        egui::Frame::new()
+                            .inner_margin(egui::Margin::symmetric(0, 2))
+                            .show(ui, |ui| {
+                                ui.label(
+                                    egui::RichText::new(text)
+                                        .color(egui::Color32::GRAY)
+                                        .monospace()
+                                        .size(font_size),
+                                )
+                            })
+                            .response
+                    }
+                    TokenStyle::RedexHead(comb) => {
+                        // Pass the combinator to get specific colors
+                        let (bg, _, outline) = Self::get_redex_colors(*comb);
+                        egui::Frame::new()
+                            .fill(bg)
+                            .stroke(egui::Stroke::new(1.0, outline))
+                            .corner_radius(1.0)
+                            .inner_margin(egui::Margin::symmetric(4, 2))
+                            .show(ui, |ui| {
+                                ui.label(
+                                    egui::RichText::new(text)
+                                        .color(egui::Color32::WHITE)
+                                        .monospace()
+                                        .size(font_size),
+                                )
+                            })
+                            .response
+                    }
+                    TokenStyle::RedexBody(comb, _arg_idx) => {
+                        // Pass the combinator to get specific colors
+                        let (_, bg, outline) = Self::get_redex_colors(*comb);
+                        egui::Frame::new()
+                            .fill(bg)
+                            .stroke(egui::Stroke::new(1.0, outline))
+                            .corner_radius(1.0)
+                            .inner_margin(egui::Margin::symmetric(4, 2))
+                            .show(ui, |ui| {
+                                ui.label(
+                                    egui::RichText::new(text)
+                                        .color(egui::Color32::LIGHT_GRAY)
+                                        .monospace()
+                                        .size(font_size),
+                                )
+                            })
+                            .response
+                    }
+                };
+
+                if response.hovered()
+                    && let Some(_key) = node_key
+                {
+                    // Display AST tooltip...
+                }
+            }
+
+            // If we truncated, add a muted label indicating how much was hidden
+            if truncated_count > 0 {
+                ui.label(
+                    egui::RichText::new(format!("... ({truncated_count} more tokens)"))
+                        .color(egui::Color32::DARK_GRAY)
+                        .italics()
+                        .size(font_size),
+                );
+            }
+        });
     }
 }

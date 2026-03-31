@@ -6,7 +6,7 @@ slotmap::new_key_type! {
 }
 
 /// A node in the flat AST
-#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+#[derive(Debug, Clone, Copy, PartialEq, Eq, PartialOrd, Ord, Hash)]
 pub enum Node {
     Comb(NodeComb),
     // Graph structure
@@ -14,7 +14,7 @@ pub enum Node {
     Indirection(NodeKey),
 }
 
-#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+#[derive(Debug, Clone, Copy, PartialEq, Eq, PartialOrd, Ord, Hash)]
 pub enum NodeComb {
     S,
     K,

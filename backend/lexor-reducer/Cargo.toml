@@ -9,6 +9,7 @@ description.workspace = true
 workspace = true
 
 [dependencies]
+serde = { workspace = true }
 lower = { workspace = true }
 slotmap = { workspace = true }
 arrayvec = { workspace = true }

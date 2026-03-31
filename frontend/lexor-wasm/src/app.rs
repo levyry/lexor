@@ -22,7 +22,7 @@ pub struct LexorApp {
     settings: Settings,
     tree: DockState<AppTabs>,
     #[serde(skip)]
-    worker: WorkerBridge,
+    worker: Option<WorkerBridge>,
 }
 
 impl Default for LexorApp {
@@ -45,7 +45,7 @@ impl Default for LexorApp {
             .split_right(ski_node, 0.5, vec![reduction_tab]);
 
         let message_queue = Rc::new(RefCell::new(Vec::new()));
-        let worker = WorkerBridge::new(message_queue.clone());
+        let worker = None;
 
         state.messages = message_queue;
 
@@ -64,6 +64,10 @@ impl eframe::App for LexorApp {
     }
 
     fn update(&mut self, ctx: &egui::Context, _frame: &mut eframe::Frame) {
+        if self.worker.is_none() {
+            let bridge = WorkerBridge::new(self.state.messages.clone(), ctx.clone());
+            self.worker = Some(bridge);
+        }
         self.handle_debouncers(ctx);
         self.process_message_queue();
         self.draw_canvas(ctx);
@@ -152,7 +156,9 @@ impl LexorApp {
                     wants_graph,
                 };
 
-                self.worker.send_job(&request);
+                if let Some(bridge) = self.worker.as_ref() {
+                    bridge.send_job(&request);
+                }
 
                 // Set loading screen while waiting
                 // TODO: Refactor into something cleaner later

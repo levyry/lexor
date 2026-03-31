@@ -5,12 +5,13 @@ use wasm_bindgen::{JsCast, prelude::Closure};
 
 use crate::messages::AppMessage;
 
+#[derive(Debug, Clone)]
 pub struct WorkerBridge {
     worker: web_sys::Worker,
 }
 
 impl WorkerBridge {
-    pub fn new(queue: Rc<RefCell<Vec<AppMessage>>>) -> Self {
+    pub fn new(queue: Rc<RefCell<Vec<AppMessage>>>, ctx: egui::Context) -> Self {
         let options = web_sys::WorkerOptions::new();
         options.set_type(web_sys::WorkerType::Module);
 
@@ -20,11 +21,28 @@ impl WorkerBridge {
         #[allow(clippy::as_conversions)]
         let callback = Closure::wrap(Box::new(move |event: web_sys::MessageEvent| {
             if let Some(json_str) = event.data().as_string() {
-                let response: WorkerResponse = serde_json::from_str(&json_str)
-                    .expect("Failed to deserialize response in closure");
-                queue
-                    .borrow_mut()
-                    .push(AppMessage::WorkerJobCompleted(response));
+                match serde_json::from_str::<WorkerResponse>(&json_str) {
+                    Ok(response) => {
+                        queue
+                            .borrow_mut()
+                            .push(AppMessage::WorkerJobCompleted(response));
+
+                        ctx.request_repaint();
+                    }
+                    Err(err) => {
+                        // This will print the exact JSON and the specific type mismatch to your F12 console!
+                        #[cfg(target_arch = "wasm32")]
+                        web_sys::console::error_1(
+                            &format!(
+                                "DESERIALIZATION PANIC!\nError: {}\nJSON Received: {}",
+                                err, json_str
+                            )
+                            .into(),
+                        );
+                        #[cfg(not(target_arch = "wasm32"))]
+                        unreachable!("asdasdasd {err}")
+                    }
+                }
             }
         }) as Box<dyn FnMut(_)>);
 

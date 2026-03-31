@@ -23,6 +23,7 @@ fn main() -> eframe::Result {
 
 #[cfg(target_arch = "wasm32")]
 fn main() {
+    console_error_panic_hook::set_once();
     // Check if we are in the main thread or the Web Worker
     if web_sys::window().is_none() {
         return;

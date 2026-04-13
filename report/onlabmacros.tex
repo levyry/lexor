@@ -1,0 +1,77 @@
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+% Ezt ne piszkáld!!!!
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+\pagestyle{myheadings} % legyen fejléc 
+
+\newcommand{\onlabcim}{
+  \begin{center}
+    \huge{\textbf{Önálló laboratórium beszámoló}}
+
+    \small{Távközlési és Mesterséges Intelligencia Tanszék}
+  \end{center}
+} 
+
+% Argumentumok: #1=Név, #2=Neptunkód, #3=szakirány, #4=email, #5 konzulens-1, #6 konzulens-1-email, #7 konzulens-2, #8 konzulens-2-email
+\newcommand{\onlabszerzo}[8]{
+
+\begin{center}
+  \begin{tabular}{ r l }
+  Név:        & \textbf{#1}  \\
+              & \href{mailto:#4}{\textbf{#4}}  \\
+  Neptun-kód: & \textbf{\texttt{#2}}  \\
+  Szakirány:  & \textbf{#3}  \\
+  Konzulens: & \textbf{#5}  \\
+             & \href{mailto:#6}{\textbf{#6}} \\
+  Konzulens: & \textbf{#7}  \\
+             & \href{mailto:#8}{\textbf{#8}}  \\
+  
+  \end{tabular}
+\end{center}
+
+}
+
+% % Argumentumok: #1=Név, #2=email
+% \newcommand{\konzulens}[2]{
+%   \noindent\textbf{Konzulens:} #1 
+%   \newline\emph{Email cím:}\/ \href{mailto:#2}{#2}
+%   \newline
+% 
+% }
+
+% Argumentumok: #1=Tanév (xxxx/xx alakban, #2=félév (pont nélkül)
+\newcommand{\tanevfelev}[2]{
+  \large\noindent\textbf{Tanév:} #1. tanév, #2. félév
+  \newline
+}
+
+% Argumentumok: #1=téma címe 
+\newcommand{\feladatcim}[1]{
+  \large\noindent\textbf{Téma címe: #1}
+  \bigskip
+}
+
+% Argumentumok: #1=téma részletei 
+\newcommand{\feladatmaga}[1]{
+\large\noindent\textbf{Feladat:} 
+  \newline
+ #1
+ \newline
+ \smallskip
+}
+
+% A fejezetek közé beágyazott irod.jegyzék
+\def\thebibliography#1{\renewcommand{%
+\baselinestretch}{1}\subsection{A tanulm\'anyozott irodalom jegyz\'eke}\list
+ {\small [\arabic{enumi}]}{\settowidth\labelwidth{[#1]}\leftmargin\labelwidth
+ \advance\leftmargin\labelsep
+ \usecounter{enumi}}
+ \def\newblock{\small \hskip .11em plus .33em minus .07em}
+ \sloppy\clubpenalty4000\widowpenalty4000
+ \sfcode`\.=1000\relax}
+\let\endthebibliography=\endlist%
+
+
+%%% Local Variables: 
+%%% mode: latex
+%%% TeX-master: "template"
+%%% End: 

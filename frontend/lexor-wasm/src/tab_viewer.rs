@@ -1,5 +1,6 @@
 use egui::{TopBottomPanel, Ui, WidgetText};
 use egui_dock::{TabViewer, tab_viewer::OnCloseResponse};
+use egui_graphs::SettingsNavigation;
 use lexor_api::{
     SourceID,
     visual::{RenderToken, TokenStyle, VisualComb},
@@ -35,7 +36,7 @@ impl TabViewer for LexorTabViewer<'_> {
 
     fn ui(&mut self, ui: &mut Ui, tab: &mut Self::Tab) {
         match *tab {
-            AppTabs::Welcome => self.welcome_view(ui),
+            AppTabs::Welcome => welcome_view(ui),
             AppTabs::SkiSource(id) => self.ski_source_view(ui, id),
             AppTabs::ReductionChain(source_id) => self.reduction_output_view(ui, source_id),
             AppTabs::ReductionGraph(source_id) => self.reduction_graph_view(ui, source_id),
@@ -44,21 +45,18 @@ impl TabViewer for LexorTabViewer<'_> {
 
     fn on_close(&mut self, tab: &mut Self::Tab) -> OnCloseResponse {
         if let AppTabs::SkiSource(id) = tab {
-            self.state
-                .messages
-                .borrow_mut()
-                .push(AppMessage::CloseSourceTab(*id));
+            self.state.push_msg(AppMessage::CloseSourceTab(*id));
         }
         OnCloseResponse::Close
     }
 }
 
-impl LexorTabViewer<'_> {
-    fn welcome_view(&self, ui: &mut Ui) {
-        ui.heading("Welcome to Lexor!");
-        ui.label("Lexor is a compiler and VM for lambda calculus targeting combinators. It provides intuitive visualizations for reduction rules and abstract syntax trees. For a list of full capabilities, check out the Help page.");
-    }
+fn welcome_view(ui: &mut Ui) {
+    ui.heading("Welcome to Lexor!");
+    ui.label("Lexor is a compiler and VM for lambda calculus targeting combinators. It provides intuitive visualizations for reduction rules and abstract syntax trees. For a list of full capabilities, check out the Help page.");
+}
 
+impl LexorTabViewer<'_> {
     fn ski_source_view(&mut self, ui: &mut Ui, id: SourceID) {
         ui.vertical(|ui| {
             let panel_id = egui::Id::new("source_top_panel").with(id);
@@ -67,17 +65,11 @@ impl LexorTabViewer<'_> {
                 ui.horizontal_top(|ui| {
                     ui.menu_button("Add new...", |ui| {
                         if ui.button("Reduction Chain").clicked() {
-                            self.state
-                                .messages
-                                .borrow_mut()
-                                .push(AppMessage::RequestChainOutput(id));
+                            self.state.push_msg(AppMessage::RequestChainOutput(id));
                             ui.close_kind(egui::UiKind::Menu);
                         }
                         if ui.button("Reduction Graph").clicked() {
-                            self.state
-                                .messages
-                                .borrow_mut()
-                                .push(AppMessage::RequestGraphOutput(id));
+                            self.state.push_msg(AppMessage::RequestGraphOutput(id));
                             ui.close_kind(egui::UiKind::Menu);
                         }
                     });
@@ -93,66 +85,181 @@ impl LexorTabViewer<'_> {
     }
 
     fn reduction_output_view(&self, ui: &mut Ui, source_id: SourceID) {
-        let steps = self
-            .state
-            .reduction_steps
-            .get(&source_id)
-            .expect("Reduction steps not found");
-        let row_height = 20.0;
+        if let Some(response) = self.state.reduction_steps.get(&source_id)
+            && let Some(steps) = response
+        {
+            if steps.is_empty() {
+                ui.centered_and_justified(|ui| {
+                    ui.label("Input field has no content.");
+                });
+                return;
+            }
 
-        egui::ScrollArea::vertical()
-            .auto_shrink([false, false])
-            .show_rows(ui, row_height, steps.len(), |ui, row_range| {
-                for index in row_range {
-                    let step = steps.get(index).expect(
+            let row_height = 20.0;
+
+            egui::ScrollArea::vertical()
+                .auto_shrink([false, false])
+                .show_rows(ui, row_height, steps.len(), |ui, row_range| {
+                    for index in row_range {
+                        let step = steps.get(index).expect(
                         "We gave steps.len() in show_rows, so this should stay in bounds always.",
                     );
 
-                    let next_index = index.saturating_add(1);
+                        let next_index = index.saturating_add(1);
 
-                    ui.horizontal(|ui| {
-                        ui.add(egui::Label::new(
-                            egui::RichText::new(format!("{next_index:3}."))
-                                .monospace()
-                                .color(egui::Color32::DARK_GRAY),
-                        ));
+                        ui.horizontal(|ui| {
+                            let is_active =
+                                self.state.active_graph_step.get(&source_id) == Some(&index);
 
-                        LexorTabViewer::render_steps(ui, step);
-                    });
-                }
-            });
-    }
+                            // TODO: Only make the label clickable if a graph
+                            // view is currently open.
+                            let line_label = format!("{next_index:3}.");
+                            if ui
+                                .selectable_label(
+                                    is_active,
+                                    egui::RichText::new(line_label).monospace(),
+                                )
+                                .clicked()
+                            {
+                                self.state
+                                    .push_msg(AppMessage::SetGraphStep(source_id, index));
+                            }
 
-    pub fn reduction_graph_view(&mut self, ui: &mut egui::Ui, source_id: SourceID) {
-        if let Some(graph) = self.state.compiled_graphs.get_mut(&source_id) {
-            type L = egui_graphs::LayoutHierarchical;
-            type S = egui_graphs::LayoutStateHierarchical;
-
-            // 1. Give this specific graph instance a UNIQUE ID!
-            // This stops egui from sharing corrupted layout states across tabs or updates.
-            let id = Some(format!("ast_{}_{}", source_id, graph.g().node_count()));
-
-            // 2. Fetch and set the state using the unique ID
-            let state = egui_graphs::get_layout_state::<S>(ui, id.clone());
-            egui_graphs::set_layout_state::<S>(ui, state, id.clone());
-
-            // 3. Bind the unique ID to the GraphView
-            let mut graph_view =
-                egui_graphs::GraphView::<_, _, _, _, _, _, S, L>::new(graph).with_id(id);
-
-            ui.add(&mut graph_view);
-
-            // 4. Force egui to render subsequent frames immediately.
-            // Frame 1: Widget sizes are 0. Layout squashes.
-            // Frame 2: Real sizes are known. Layout expands.
-            ui.ctx().request_repaint();
+                            LexorTabViewer::render_steps(ui, step);
+                        });
+                    }
+                });
         } else {
             ui.centered_and_justified(|ui| {
-                ui.label("Waiting for graph data...");
+                ui.label("Compiling...");
             });
         }
     }
 
+    pub fn reduction_graph_view(&mut self, ui: &mut egui::Ui, source_id: SourceID) {
+        let current_step = *self.state.active_graph_step.get(&source_id).unwrap_or(&0);
+        self.graph_controls_view(ui, source_id, current_step);
+        self.graph_view(ui, source_id, current_step);
+    }
+
+    fn graph_view(&mut self, ui: &mut Ui, source_id: usize, current_step: usize) {
+        if let Some(graph_cache) = self.state.compiled_graphs.get_mut(&source_id)
+            && let Some(graph) = graph_cache.get_mut(&current_step)
+        {
+            ui.set_min_size(egui::vec2(200.0, 200.0));
+            let available = ui.available_size();
+
+            // TODO: Refactor this in the future
+            if available.x > 100.0 && available.y > 100.0 {
+                let id = Some(format!("ast_view_{source_id}"));
+
+                let tracker_id = egui::Id::new("step_tracker").with(source_id);
+                let previous_step =
+                    ui.data(|d| d.get_temp::<usize>(tracker_id).unwrap_or(usize::MAX));
+
+                if previous_step != current_step {
+                    egui_graphs::reset_layout::<egui_graphs::LayoutStateHierarchical>(
+                        ui,
+                        id.clone(),
+                    );
+                    ui.data_mut(|d| d.insert_temp(tracker_id, current_step));
+                }
+
+                // Settings navigation
+                let mut nav_settings = SettingsNavigation::default();
+                let node_count = graph.node_count();
+                let padding = if node_count <= 1 { 4.0 } else { 0.1 };
+                nav_settings = nav_settings.with_fit_to_screen_padding(padding);
+
+                let mut graph_view = egui_graphs::GraphView::<
+                    _,
+                    _,
+                    _,
+                    _,
+                    _,
+                    _,
+                    egui_graphs::LayoutStateHierarchical,
+                    egui_graphs::LayoutHierarchical,
+                >::new(graph)
+                .with_navigations(&nav_settings)
+                .with_id(id);
+
+                ui.add(&mut graph_view);
+            } else {
+                ui.allocate_space(available);
+            }
+
+            ui.ctx().request_repaint();
+        } else {
+            ui.centered_and_justified(|ui| {
+                if let Some(response) = self.state.reduction_graph.get(&source_id)
+                    && let Some(graph_history) = response
+                    && graph_history.get(current_step).is_some()
+                {
+                    self.state
+                        .push_msg(AppMessage::SetGraphStep(source_id, current_step));
+                    ui.label("Compiling graph...");
+                } else {
+                    ui.label("Input field has no content.");
+                }
+            });
+        }
+    }
+
+    fn graph_controls_view(&self, ui: &mut Ui, source_id: usize, mut current_step: usize) {
+        if let Some(response) = self.state.reduction_graph.get(&source_id)
+            && let Some(graph_history) = response
+            && !graph_history.is_empty()
+        {
+            let max_step = graph_history.len().saturating_sub(1);
+
+            ui.horizontal(|ui| {
+                if ui.button("⬅").clicked() && current_step > 0 {
+                    self.state.push_msg(AppMessage::SetGraphStep(
+                        source_id,
+                        current_step.saturating_sub(1),
+                    ));
+                }
+                if ui.button("➡").clicked() && current_step < max_step {
+                    self.state.push_msg(AppMessage::SetGraphStep(
+                        source_id,
+                        current_step.saturating_add(1),
+                    ));
+                }
+
+                let slider = egui::Slider::new(&mut current_step, 0..=max_step).text("Step");
+                if ui.add(slider).changed() {
+                    self.state
+                        .push_msg(AppMessage::SetGraphStep(source_id, current_step));
+                }
+            });
+
+            ui.separator();
+
+            if ui.ui_contains_pointer() {
+                if ui.input(|i| {
+                    i.key_pressed(egui::Key::ArrowLeft) || i.key_pressed(egui::Key::ArrowUp)
+                }) && current_step > 0
+                {
+                    self.state.push_msg(AppMessage::SetGraphStep(
+                        source_id,
+                        current_step.saturating_sub(1),
+                    ));
+                }
+                if ui.input(|i| {
+                    i.key_pressed(egui::Key::ArrowRight) || i.key_pressed(egui::Key::ArrowDown)
+                }) && current_step < max_step
+                {
+                    self.state.push_msg(AppMessage::SetGraphStep(
+                        source_id,
+                        current_step.saturating_add(1),
+                    ));
+                }
+            }
+        }
+    }
+
+    // #[must_use]
     pub const fn get_redex_colors(
         comb: VisualComb,
     ) -> (egui::Color32, egui::Color32, egui::Color32) {
@@ -233,9 +340,9 @@ impl LexorTabViewer<'_> {
                     }
                     TokenStyle::RedexHead(comb) => {
                         // Pass the combinator to get specific colors
-                        let (bg, _, outline) = Self::get_redex_colors(*comb);
+                        let (head, _bg, outline) = Self::get_redex_colors(*comb);
                         egui::Frame::new()
-                            .fill(bg)
+                            .fill(head)
                             .stroke(egui::Stroke::new(1.0_f32, outline))
                             .corner_radius(1.0)
                             .inner_margin(egui::Margin::symmetric(4, 2))
@@ -251,7 +358,7 @@ impl LexorTabViewer<'_> {
                     }
                     TokenStyle::RedexBody(comb, _arg_idx) => {
                         // Pass the combinator to get specific colors
-                        let (_, bg, outline) = Self::get_redex_colors(*comb);
+                        let (_head, bg, outline) = Self::get_redex_colors(*comb);
                         egui::Frame::new()
                             .fill(bg)
                             .stroke(egui::Stroke::new(1.0_f32, outline))

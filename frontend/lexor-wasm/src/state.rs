@@ -1,18 +1,19 @@
 use std::{cell::RefCell, collections::HashMap, rc::Rc};
 
 use egui_dock::Style;
-use lexor_api::{GraphStep, ReductionStep, SourceID, visual::RenderToken};
+use lexor_api::{GraphStep, ReductionStep, SourceID};
 use serde::{Deserialize, Serialize};
 
-use crate::{messages::AppMessage, tab_viewer::AppTabs};
+use crate::{graph::LexorGraph, messages::AppMessage, tab_viewer::AppTabs};
 
 #[derive(Default, Serialize, Deserialize)]
 pub struct AppState {
     pub inputs: HashMap<SourceID, String>,
-    pub reduction_steps: HashMap<SourceID, Vec<ReductionStep>>,
-    pub reduction_graph: HashMap<SourceID, Vec<GraphStep>>,
+    pub reduction_steps: HashMap<SourceID, Option<Vec<ReductionStep>>>,
+    pub reduction_graph: HashMap<SourceID, Option<Vec<GraphStep>>>,
     pub last_edited_time: HashMap<SourceID, f64>,
     pub last_assigned_key: usize,
+    pub active_graph_step: HashMap<SourceID, usize>,
 
     pub style: Option<Style>,
 
@@ -20,7 +21,7 @@ pub struct AppState {
     pub messages: Rc<RefCell<Vec<AppMessage>>>,
 
     #[serde(skip)]
-    pub compiled_graphs: HashMap<SourceID, egui_graphs::Graph<(), ()>>,
+    pub compiled_graphs: HashMap<SourceID, HashMap<usize, LexorGraph>>,
 }
 
 impl AppState {
@@ -38,19 +39,16 @@ impl AppState {
     }
 
     pub fn new_reduction_output(&mut self, id: usize) -> AppTabs {
-        self.reduction_steps.insert(
-            id,
-            vec![vec![RenderToken {
-                text: String::new(),
-                style: lexor_api::visual::TokenStyle::Normal,
-                node_key: None,
-            }]],
-        );
+        self.reduction_steps.insert(id, None);
         AppTabs::ReductionChain(id)
     }
 
     pub fn new_graph_output(&mut self, id: usize) -> AppTabs {
-        self.reduction_graph.insert(id, vec![]);
+        self.reduction_graph.insert(id, None);
         AppTabs::ReductionGraph(id)
+    }
+
+    pub fn push_msg(&self, msg: AppMessage) {
+        self.messages.borrow_mut().push(msg);
     }
 }

@@ -30,9 +30,9 @@ pub enum EngineGraphNodeKind {
 
 #[derive(Debug, Clone, PartialEq, Eq, PartialOrd, Ord, Hash)]
 pub struct EngineGraphNode {
-    pub id: usize,
+    pub id: u64,
     pub kind: EngineGraphNodeKind,
-    pub children: Vec<usize>,
+    pub children: Vec<u64>,
 }
 
 #[derive(Debug, Clone, Copy)]
@@ -84,85 +84,99 @@ impl<'a> EngineView<'a> {
             }
         }
 
-        self.traverse_to_tokens(
-            self.0.root,
-            false,
-            NodeRole::Normal,
-            false,
+        self.traverse_to_tokens(redex_parent, &redex_args, active_comb, &mut visitor);
+    }
+
+    fn traverse_to_tokens(
+        self,
+        redex_parent: Option<NodeKey>,
+        redex_args: &[NodeKey],
+        active_comb: Option<NodeComb>,
+        visitor: &mut dyn FnMut(&str, NodeRole, Option<NodeKey>),
+    ) {
+        let initial_state = TraverseState {
+            current_key: self.0.root,
+            current_role: NodeRole::Normal,
+            is_rhs_of_app: false,
+            is_redex_head: false,
+        };
+
+        self.traverse_to_tokens_rec(
+            initial_state,
             redex_parent,
-            &redex_args,
+            redex_args,
             active_comb,
-            &mut visitor,
+            visitor,
         );
     }
 
-    // TODO: what the fuck
-    fn traverse_to_tokens(
+    fn traverse_to_tokens_rec(
         self,
-        key: NodeKey,
-        is_rhs_of_app: bool,
-        mut current_role: NodeRole,
-        is_redex_head: bool,
+        mut state: TraverseState,
         redex_parent: Option<NodeKey>,
         redex_args: &[NodeKey],
         active_comb: Option<NodeComb>,
         visitor: &mut dyn FnMut(&str, NodeRole, Option<NodeKey>),
     ) {
         let arena = &self.0.arena;
-        let mut current = key;
+        let mut current = state.current_key;
 
         while let Ok(Node::Indirection(target)) = arena.get(current) {
             current = *target;
         }
 
-        if current_role == NodeRole::Normal
+        if state.current_role == NodeRole::Normal
             && let Some(arg_idx) = redex_args.iter().position(|&k| k == current)
             && let Some(comb) = active_comb
         {
-            current_role = NodeRole::RedexArg(comb, arg_idx);
+            state.current_role = NodeRole::RedexArg(comb, arg_idx);
         }
 
         match arena.get(current) {
             Ok(Node::App(lhs, rhs)) => {
-                if is_rhs_of_app {
-                    visitor("(", current_role, Some(current));
+                if state.is_rhs_of_app {
+                    visitor("(", state.current_role, Some(current));
                 }
 
                 let is_lhs_head = Some(current) == redex_parent;
 
-                self.traverse_to_tokens(
-                    *lhs,
-                    false,
-                    current_role,
-                    is_lhs_head,
+                self.traverse_to_tokens_rec(
+                    TraverseState {
+                        current_key: *lhs,
+                        current_role: state.current_role,
+                        is_rhs_of_app: false,
+                        is_redex_head: is_lhs_head,
+                    },
                     redex_parent,
                     redex_args,
                     active_comb,
-                    &mut *visitor,
+                    visitor,
                 );
 
                 // visitor(" ", current_role, Some(current));
 
-                self.traverse_to_tokens(
-                    *rhs,
-                    true,
-                    current_role,
-                    false,
+                self.traverse_to_tokens_rec(
+                    TraverseState {
+                        current_key: *rhs,
+                        current_role: state.current_role,
+                        is_rhs_of_app: true,
+                        is_redex_head: false,
+                    },
                     redex_parent,
                     redex_args,
                     active_comb,
-                    &mut *visitor,
+                    visitor,
                 );
 
-                if is_rhs_of_app {
-                    visitor(")", current_role, Some(current));
+                if state.is_rhs_of_app {
+                    visitor(")", state.current_role, Some(current));
                 }
             }
             Ok(Node::Comb(x)) => {
-                let role = if is_redex_head {
+                let role = if state.is_redex_head {
                     active_comb.map_or(NodeRole::RedexHead(*x), NodeRole::RedexHead)
                 } else {
-                    current_role
+                    state.current_role
                 };
                 visitor(x.to_string().as_str(), role, Some(current));
             }
@@ -172,6 +186,7 @@ impl<'a> EngineView<'a> {
     }
 
     /// Extracts the currently reachable graph using backend types.
+    #[must_use]
     pub fn extract_graph(&self) -> Vec<EngineGraphNode> {
         let mut graph = Vec::new();
         let mut visited = HashSet::new();
@@ -188,13 +203,13 @@ impl<'a> EngineView<'a> {
             }
 
             if let Ok(node) = self.0.arena.get(resolved_key) {
-                let id = resolved_key.data().as_ffi() as usize;
+                let id = resolved_key.data().as_ffi();
 
                 match node {
                     Node::Comb(comb) => {
                         graph.push(EngineGraphNode {
                             id,
-                            kind: EngineGraphNodeKind::Comb(*comb), // Internal NodeComb
+                            kind: EngineGraphNodeKind::Comb(*comb),
                             children: vec![],
                         });
                     }
@@ -209,8 +224,8 @@ impl<'a> EngineView<'a> {
                             resolved_rhs = *t;
                         }
 
-                        let id_lhs = resolved_lhs.data().as_ffi() as usize;
-                        let id_rhs = resolved_rhs.data().as_ffi() as usize;
+                        let id_lhs = resolved_lhs.data().as_ffi();
+                        let id_rhs = resolved_rhs.data().as_ffi();
 
                         graph.push(EngineGraphNode {
                             id,
@@ -241,4 +256,12 @@ impl Display for EngineView<'_> {
         });
         write!(f, "{output}")
     }
+}
+
+#[derive(Debug, Clone, Copy, PartialEq, Eq, PartialOrd, Ord)]
+struct TraverseState {
+    current_key: NodeKey,
+    current_role: NodeRole,
+    is_rhs_of_app: bool,
+    is_redex_head: bool,
 }

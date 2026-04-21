@@ -30,7 +30,6 @@ impl WorkerBridge {
                         ctx.request_repaint();
                     }
                     Err(err) => {
-                        // This will print the exact JSON and the specific type mismatch to your F12 console!
                         #[cfg(target_arch = "wasm32")]
                         web_sys::console::error_1(
                             &format!(
@@ -40,14 +39,14 @@ impl WorkerBridge {
                             .into(),
                         );
                         #[cfg(not(target_arch = "wasm32"))]
-                        unreachable!("asdasdasd {err}")
+                        unreachable!("{err}")
                     }
                 }
             }
         }) as Box<dyn FnMut(_)>);
 
         worker.set_onmessage(Some(callback.as_ref().unchecked_ref()));
-        callback.forget();
+        callback.forget(); // forgor
 
         Self { worker }
     }

@@ -1,6 +1,6 @@
 #![cfg_attr(not(debug_assertions), windows_subsystem = "windows")] // hide console window on Windows in release
 
-use std::{cell::RefCell, rc::Rc, vec};
+use std::{cell::RefCell, collections::HashMap, rc::Rc, vec};
 
 use crate::{
     messages::{AppMessage, SourceType},
@@ -12,7 +12,7 @@ use crate::{
 };
 use egui::{CentralPanel, Frame, TopBottomPanel, Ui};
 use egui_dock::{DockArea, DockState, NodeIndex, Style};
-use lexor_api::{SourceID, WorkerRequest, visual::RenderToken};
+use lexor_api::{SourceID, WorkerRequest};
 use serde::{Deserialize, Serialize};
 
 #[derive(Serialize, Deserialize)]
@@ -91,9 +91,7 @@ impl LexorApp {
         ui.menu_button("Add", |ui| {
             if ui.button("SKI source").clicked() {
                 self.state
-                    .messages
-                    .borrow_mut()
-                    .push(AppMessage::RequestNewSource(SourceType::Ski));
+                    .push_msg(AppMessage::RequestNewSource(SourceType::Ski));
                 ui.close();
             }
         });
@@ -139,10 +137,46 @@ impl LexorApp {
             AppMessage::RequestChainOutput(source_id) => {
                 let tab = self.state.new_reduction_output(source_id);
                 self.spawn_tab(tab);
+
+                // Send a reduction job so that if the user opened this panel
+                // after already having typed in the input, it populates
+                // automatically.
+                self.state.push_msg(AppMessage::SendReductionJob(source_id));
             }
             AppMessage::RequestGraphOutput(source_id) => {
                 let tab = self.state.new_graph_output(source_id);
                 self.spawn_tab(tab);
+
+                // Send a reduction job so that if the user opened this panel
+                // after already having typed in the input, it populates
+                // automatically.
+                self.state.push_msg(AppMessage::SendReductionJob(source_id));
+            }
+            AppMessage::SetGraphStep(source_id, step_idx) => {
+                let is_active = self.state.active_graph_step.get(&source_id) == Some(&step_idx);
+
+                let is_compiled = self
+                    .state
+                    .compiled_graphs
+                    .get(&source_id)
+                    .is_some_and(|c| c.contains_key(&step_idx));
+
+                if is_active && is_compiled {
+                    return;
+                }
+
+                self.state.active_graph_step.insert(source_id, step_idx);
+
+                if let Some(response) = self.state.reduction_graph.get(&source_id)
+                    && let Some(graph_history) = response
+                    && let Some(step_data) = graph_history.get(step_idx)
+                {
+                    let cache = self.state.compiled_graphs.entry(source_id).or_default();
+
+                    cache
+                        .entry(step_idx)
+                        .or_insert_with(|| crate::graph::build_egui_graph(step_data));
+                }
             }
             AppMessage::SendReductionJob(source_id) => {
                 let input = self
@@ -150,6 +184,8 @@ impl LexorApp {
                     .inputs
                     .get(&source_id)
                     .expect("SourceID not found while trying to run reduction");
+
+                self.state.reduction_steps.remove(&source_id);
 
                 let wants_steps = self.is_steps_open_for(source_id);
                 let wants_graph = self.is_graph_open_for(source_id);
@@ -164,23 +200,12 @@ impl LexorApp {
                 if let Some(bridge) = self.worker.as_ref() {
                     bridge.send_job(&request);
                 }
-
-                // Set loading screen while waiting
-                // TODO: Refactor into something cleaner later
-                if wants_steps {
-                    self.state.reduction_steps.insert(
-                        source_id,
-                        vec![vec![RenderToken {
-                            text: "Loading...".to_owned(),
-                            style: lexor_api::visual::TokenStyle::Normal,
-                            node_key: None,
-                        }]],
-                    );
-                }
             }
             AppMessage::CloseSourceTab(source_id) => {
                 self.tree.retain_tabs(|tab| match tab {
-                    AppTabs::ReductionChain(out_id) => *out_id != source_id,
+                    AppTabs::ReductionChain(out_id) | AppTabs::ReductionGraph(out_id) => {
+                        *out_id != source_id
+                    }
                     _ => true,
                 });
                 self.state.inputs.remove(&source_id);
@@ -189,23 +214,34 @@ impl LexorApp {
                 self.state.last_assigned_key = *self.state.inputs.keys().max().unwrap_or(&0usize);
             }
             AppMessage::WorkerJobCompleted(worker_response) => {
-                if let Some(steps) = worker_response.steps {
+                let source_id = worker_response.source_id;
+
+                if let Some(computed_steps) = worker_response.steps {
                     self.state
                         .reduction_steps
-                        .insert(worker_response.source_id, steps);
+                        .insert(source_id, Some(computed_steps));
                 }
 
-                if let Some(graph) = worker_response.graph_nodes {
-                    if let Some(last_step) = graph.last() {
-                        let egui_graph = crate::graph::build_egui_graph(last_step);
-                        self.state
-                            .compiled_graphs
-                            .insert(worker_response.source_id, egui_graph);
-                    }
+                if let Some(graph_history) = worker_response.graph_nodes {
+                    const DEFAULT_STEP_IDX: usize = 0;
+                    self.state
+                        .active_graph_step
+                        .insert(source_id, DEFAULT_STEP_IDX);
 
+                    // Remove stale data
+                    self.state.compiled_graphs.remove(&source_id);
+
+                    if let Some(first_step) = graph_history.get(DEFAULT_STEP_IDX) {
+                        let egui_graph = crate::graph::build_egui_graph(first_step);
+
+                        let mut graph_cache = HashMap::new();
+                        graph_cache.insert(DEFAULT_STEP_IDX, egui_graph);
+
+                        self.state.compiled_graphs.insert(source_id, graph_cache);
+                    }
                     self.state
                         .reduction_graph
-                        .insert(worker_response.source_id, graph);
+                        .insert(source_id, Some(graph_history));
                 }
             }
         }
@@ -238,10 +274,7 @@ impl LexorApp {
         });
 
         for id in to_recompile {
-            self.state
-                .messages
-                .borrow_mut()
-                .push(AppMessage::SendReductionJob(id));
+            self.state.push_msg(AppMessage::SendReductionJob(id));
         }
     }
 

@@ -10,7 +10,7 @@ pub enum ApiGraphNodeKind {
 
 #[derive(Debug, Serialize, Deserialize, Clone, PartialEq, Eq, PartialOrd, Ord, Hash)]
 pub struct NodeData {
-    pub id: usize,
+    pub id: u64,
     pub kind: ApiGraphNodeKind,
-    pub children: Vec<usize>,
+    pub children: Vec<u64>,
 }

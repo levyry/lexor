@@ -13,6 +13,7 @@ pub enum AppMessage {
     RequestChainOutput(SourceID),
     RequestGraphOutput(SourceID),
     SendReductionJob(SourceID),
+    SetGraphStep(SourceID, usize),
     WorkerJobCompleted(WorkerResponse),
     CloseSourceTab(SourceID),
 }

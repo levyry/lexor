@@ -1,8 +1,12 @@
 use lexor_reducer::{EngineView, NF, NodeRole, ReductionStrat, core::node::NodeComb};
 use serde::{Deserialize, Serialize};
 
-use crate::visual::{RenderToken, TokenStyle, VisualComb};
+use crate::{
+    graph::NodeData,
+    visual::{RenderToken, TokenStyle, VisualComb},
+};
 
+pub mod graph;
 pub mod visual;
 
 pub type SourceID = usize;
@@ -15,16 +19,14 @@ pub struct WorkerRequest {
     pub wants_graph: bool,
 }
 
-// TODO: Figure out graph nodes data type
-pub type NodeData = ();
-
 pub type ReductionStep = Vec<RenderToken>;
+pub type GraphStep = Vec<NodeData>;
 
 #[derive(Debug, Serialize, Deserialize, Clone, PartialEq, Eq, PartialOrd, Ord, Hash)]
 pub struct WorkerResponse {
     pub source_id: usize,
     pub steps: Option<Vec<ReductionStep>>,
-    pub graph_nodes: Option<Vec<NodeData>>,
+    pub graph_nodes: Option<Vec<GraphStep>>,
 }
 
 #[must_use]
@@ -42,7 +44,7 @@ pub fn process_job(req_json: &str) -> String {
     }
 
     let mut steps: Vec<ReductionStep> = vec![];
-    let mut graph: Vec<NodeData> = vec![];
+    let mut graph: Vec<GraphStep> = vec![];
 
     let reduction_result = NF::compute_with(&req.code, |view: EngineView| {
         if req.wants_steps {
@@ -68,7 +70,29 @@ pub fn process_job(req_json: &str) -> String {
         }
 
         if req.wants_graph {
-            graph.push(()); // TODO: implement
+            // Fetch the backend graph
+            let engine_graph = view.extract_graph();
+
+            // Map it to the API graph
+            let api_graph: Vec<NodeData> = engine_graph
+                .into_iter()
+                .map(|node| {
+                    let kind = match node.kind {
+                        lexor_reducer::EngineGraphNodeKind::App => graph::ApiGraphNodeKind::App,
+                        lexor_reducer::EngineGraphNodeKind::Comb(node_comb) => {
+                            graph::ApiGraphNodeKind::Comb(node_comb.into())
+                        }
+                    };
+
+                    NodeData {
+                        id: node.id,
+                        kind,
+                        children: node.children,
+                    }
+                })
+                .collect();
+
+            graph.push(api_graph);
         }
     });
 

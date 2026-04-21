@@ -1,23 +1,26 @@
 use std::{cell::RefCell, collections::HashMap, rc::Rc};
 
 use egui_dock::Style;
-use lexor_api::{NodeData, ReductionStep, SourceID, visual::RenderToken};
+use lexor_api::{GraphStep, ReductionStep, SourceID, visual::RenderToken};
 use serde::{Deserialize, Serialize};
 
-use crate::{messages::AppMessage, tabs::AppTabs};
+use crate::{messages::AppMessage, tab_viewer::AppTabs};
 
 #[derive(Default, Serialize, Deserialize)]
 pub struct AppState {
     pub inputs: HashMap<SourceID, String>,
     pub reduction_steps: HashMap<SourceID, Vec<ReductionStep>>,
-    pub reduction_graph: HashMap<SourceID, Vec<NodeData>>,
+    pub reduction_graph: HashMap<SourceID, Vec<GraphStep>>,
     pub last_edited_time: HashMap<SourceID, f64>,
     pub last_assigned_key: usize,
 
-    pub style: AppStyle,
+    pub style: Option<Style>,
 
     #[serde(skip)]
     pub messages: Rc<RefCell<Vec<AppMessage>>>,
+
+    #[serde(skip)]
+    pub compiled_graphs: HashMap<SourceID, egui_graphs::Graph<(), ()>>,
 }
 
 impl AppState {
@@ -44,5 +47,10 @@ impl AppState {
             }]],
         );
         AppTabs::ReductionChain(id)
+    }
+
+    pub fn new_graph_output(&mut self, id: usize) -> AppTabs {
+        self.reduction_graph.insert(id, vec![]);
+        AppTabs::ReductionGraph(id)
     }
 }

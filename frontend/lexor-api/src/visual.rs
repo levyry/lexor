@@ -1,4 +1,4 @@
-use lexor_reducer::core::node::NodeKey;
+use lexor_reducer::core::node::{NodeComb, NodeKey};
 use serde::{Deserialize, Serialize};
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq, PartialOrd, Ord, Hash, Serialize, Deserialize)]
@@ -8,6 +8,18 @@ pub enum VisualComb {
     I,
     B,
     C,
+}
+
+impl From<NodeComb> for VisualComb {
+    fn from(value: NodeComb) -> Self {
+        match value {
+            NodeComb::S => Self::S,
+            NodeComb::K => Self::K,
+            NodeComb::I => Self::I,
+            NodeComb::B => Self::B,
+            NodeComb::C => Self::C,
+        }
+    }
 }
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq, PartialOrd, Ord, Hash, Serialize, Deserialize)]

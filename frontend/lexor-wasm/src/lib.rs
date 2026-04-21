@@ -1,9 +1,9 @@
 pub mod app;
+pub mod graph;
 pub mod messages;
 pub mod settings;
 pub mod state;
 pub mod tab_viewer;
-pub mod tabs;
 pub mod worker_bridge;
 
 #[cfg(target_arch = "wasm32")]

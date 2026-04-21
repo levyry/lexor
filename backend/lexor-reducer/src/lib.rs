@@ -5,6 +5,8 @@ mod engineview;
 mod graphred;
 
 pub use engineview::ArgIndex;
+pub use engineview::EngineGraphNode;
+pub use engineview::EngineGraphNodeKind;
 pub use engineview::EngineView;
 pub use engineview::NodeRole;
 pub use graphred::{NF, ReductionError, ReductionStrat, WHNF};

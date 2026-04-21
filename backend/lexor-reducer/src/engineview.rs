@@ -3,13 +3,15 @@ This module containts the [`EngineView`] struct, which is a view to the internal
 reduction engine that is provided by callbacks.
 */
 
+use slotmap::Key;
+
 use crate::core::{
-    arena::Arena,
     engine::Engine,
     node::{Node, NodeComb, NodeKey},
 };
 
 use core::fmt::{self, Display};
+use std::collections::HashSet;
 
 pub type ArgIndex = usize;
 
@@ -18,6 +20,19 @@ pub enum NodeRole {
     Normal,
     RedexHead(NodeComb),
     RedexArg(NodeComb, ArgIndex),
+}
+
+#[derive(Debug, Clone, Copy, PartialEq, Eq, PartialOrd, Ord, Hash)]
+pub enum EngineGraphNodeKind {
+    App,
+    Comb(NodeComb),
+}
+
+#[derive(Debug, Clone, PartialEq, Eq, PartialOrd, Ord, Hash)]
+pub struct EngineGraphNode {
+    pub id: usize,
+    pub kind: EngineGraphNodeKind,
+    pub children: Vec<usize>,
 }
 
 #[derive(Debug, Clone, Copy)]
@@ -155,6 +170,64 @@ impl<'a> EngineView<'a> {
             Err(err) => visitor(err.to_string().as_str(), NodeRole::Normal, Some(current)),
         }
     }
+
+    /// Extracts the currently reachable graph using backend types.
+    pub fn extract_graph(&self) -> Vec<EngineGraphNode> {
+        let mut graph = Vec::new();
+        let mut visited = HashSet::new();
+        let mut work_stack = vec![self.0.root];
+
+        while let Some(current) = work_stack.pop() {
+            let mut resolved_key = current;
+            while let Ok(Node::Indirection(target)) = self.0.arena.get(resolved_key) {
+                resolved_key = *target;
+            }
+
+            if !visited.insert(resolved_key) {
+                continue;
+            }
+
+            if let Ok(node) = self.0.arena.get(resolved_key) {
+                let id = resolved_key.data().as_ffi() as usize;
+
+                match node {
+                    Node::Comb(comb) => {
+                        graph.push(EngineGraphNode {
+                            id,
+                            kind: EngineGraphNodeKind::Comb(*comb), // Internal NodeComb
+                            children: vec![],
+                        });
+                    }
+                    Node::App(lhs, rhs) => {
+                        let mut resolved_lhs = *lhs;
+                        while let Ok(Node::Indirection(t)) = self.0.arena.get(resolved_lhs) {
+                            resolved_lhs = *t;
+                        }
+
+                        let mut resolved_rhs = *rhs;
+                        while let Ok(Node::Indirection(t)) = self.0.arena.get(resolved_rhs) {
+                            resolved_rhs = *t;
+                        }
+
+                        let id_lhs = resolved_lhs.data().as_ffi() as usize;
+                        let id_rhs = resolved_rhs.data().as_ffi() as usize;
+
+                        graph.push(EngineGraphNode {
+                            id,
+                            kind: EngineGraphNodeKind::App,
+                            children: vec![id_lhs, id_rhs],
+                        });
+
+                        work_stack.push(*lhs);
+                        work_stack.push(*rhs);
+                    }
+                    Node::Indirection(_) => unreachable!(),
+                }
+            }
+        }
+
+        graph
+    }
 }
 
 // TODO: Look into handling the two errors cases (resolved indirections and
@@ -162,38 +235,10 @@ impl<'a> EngineView<'a> {
 //       result.
 impl Display for EngineView<'_> {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
-        fn print_node(
-            arena: &Arena,
-            key: NodeKey,
-            f: &mut fmt::Formatter<'_>,
-            is_rhs_of_app: bool,
-        ) -> fmt::Result {
-            let mut current = key;
-            while let Ok(Node::Indirection(target)) = arena.get(current) {
-                current = *target;
-            }
-
-            match arena.get(current) {
-                Ok(Node::App(lhs, rhs)) => {
-                    if is_rhs_of_app {
-                        write!(f, "(")?;
-                    }
-
-                    print_node(arena, *lhs, f, false)?;
-                    // write!(f, " ")?;
-                    print_node(arena, *rhs, f, true)?;
-
-                    if is_rhs_of_app {
-                        write!(f, ")")?;
-                    }
-                    Ok(())
-                }
-                Ok(Node::Comb(x)) => write!(f, "{x}"),
-                Ok(Node::Indirection(_)) => write!(f, "Somehow found an indirection"),
-                Err(err) => write!(f, "{err}"),
-            }
-        }
-
-        print_node(&self.0.arena, self.0.root, f, false)
+        let mut output = String::new();
+        self.traverse(|text, _role, _key| {
+            output.push_str(text);
+        });
+        write!(f, "{output}")
     }
 }

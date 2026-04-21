@@ -4,8 +4,17 @@ use lexor_api::{
     SourceID,
     visual::{RenderToken, TokenStyle, VisualComb},
 };
+use serde::{Deserialize, Serialize};
 
-use crate::{messages::AppMessage, state::AppState, tabs::AppTabs};
+use crate::{messages::AppMessage, state::AppState};
+
+#[derive(Clone, Debug, PartialEq, Eq, Hash, Serialize, Deserialize)]
+pub enum AppTabs {
+    Welcome,
+    SkiSource(SourceID),
+    ReductionChain(SourceID),
+    ReductionGraph(SourceID),
+}
 
 pub struct LexorTabViewer<'a> {
     pub state: &'a mut AppState,
@@ -114,12 +123,39 @@ impl LexorTabViewer<'_> {
             });
     }
 
-    #[expect(unused)]
-    pub fn reduction_graph_view(&self, ui: &mut Ui, source_id: SourceID) {
-        todo!()
+    pub fn reduction_graph_view(&mut self, ui: &mut egui::Ui, source_id: SourceID) {
+        if let Some(graph) = self.state.compiled_graphs.get_mut(&source_id) {
+            type L = egui_graphs::LayoutHierarchical;
+            type S = egui_graphs::LayoutStateHierarchical;
+
+            // 1. Give this specific graph instance a UNIQUE ID!
+            // This stops egui from sharing corrupted layout states across tabs or updates.
+            let id = Some(format!("ast_{}_{}", source_id, graph.g().node_count()));
+
+            // 2. Fetch and set the state using the unique ID
+            let state = egui_graphs::get_layout_state::<S>(ui, id.clone());
+            egui_graphs::set_layout_state::<S>(ui, state, id.clone());
+
+            // 3. Bind the unique ID to the GraphView
+            let mut graph_view =
+                egui_graphs::GraphView::<_, _, _, _, _, _, S, L>::new(graph).with_id(id);
+
+            ui.add(&mut graph_view);
+
+            // 4. Force egui to render subsequent frames immediately.
+            // Frame 1: Widget sizes are 0. Layout squashes.
+            // Frame 2: Real sizes are known. Layout expands.
+            ui.ctx().request_repaint();
+        } else {
+            ui.centered_and_justified(|ui| {
+                ui.label("Waiting for graph data...");
+            });
+        }
     }
 
-    const fn get_redex_colors(comb: VisualComb) -> (egui::Color32, egui::Color32, egui::Color32) {
+    pub const fn get_redex_colors(
+        comb: VisualComb,
+    ) -> (egui::Color32, egui::Color32, egui::Color32) {
         match comb {
             VisualComb::S => (
                 // Red
@@ -200,7 +236,7 @@ impl LexorTabViewer<'_> {
                         let (bg, _, outline) = Self::get_redex_colors(*comb);
                         egui::Frame::new()
                             .fill(bg)
-                            .stroke(egui::Stroke::new(1.0, outline))
+                            .stroke(egui::Stroke::new(1.0_f32, outline))
                             .corner_radius(1.0)
                             .inner_margin(egui::Margin::symmetric(4, 2))
                             .show(ui, |ui| {
@@ -218,7 +254,7 @@ impl LexorTabViewer<'_> {
                         let (_, bg, outline) = Self::get_redex_colors(*comb);
                         egui::Frame::new()
                             .fill(bg)
-                            .stroke(egui::Stroke::new(1.0, outline))
+                            .stroke(egui::Stroke::new(1.0_f32, outline))
                             .corner_radius(1.0)
                             .inner_margin(egui::Margin::symmetric(4, 2))
                             .show(ui, |ui| {

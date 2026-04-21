@@ -6,8 +6,8 @@ use crate::{
     messages::{AppMessage, SourceType},
     settings::Settings,
     state::AppState,
+    tab_viewer::AppTabs,
     tab_viewer::LexorTabViewer,
-    tabs::AppTabs,
     worker_bridge::WorkerBridge,
 };
 use egui::{CentralPanel, Frame, TopBottomPanel, Ui};
@@ -70,7 +70,7 @@ impl eframe::App for LexorApp {
         }
         self.handle_debouncers(ctx);
         self.process_message_queue();
-        self.set_theme(ctx);
+        // self.set_theme(ctx);
         self.draw_canvas(ctx);
     }
 }
@@ -140,6 +140,10 @@ impl LexorApp {
                 let tab = self.state.new_reduction_output(source_id);
                 self.spawn_tab(tab);
             }
+            AppMessage::RequestGraphOutput(source_id) => {
+                let tab = self.state.new_graph_output(source_id);
+                self.spawn_tab(tab);
+            }
             AppMessage::SendReductionJob(source_id) => {
                 let input = self
                     .state
@@ -181,9 +185,9 @@ impl LexorApp {
                 });
                 self.state.inputs.remove(&source_id);
                 self.state.reduction_steps.remove(&source_id);
+                self.state.compiled_graphs.remove(&source_id);
                 self.state.last_assigned_key = *self.state.inputs.keys().max().unwrap_or(&0usize);
             }
-            AppMessage::RequestGraphOutput(_source_id) => todo!(),
             AppMessage::WorkerJobCompleted(worker_response) => {
                 if let Some(steps) = worker_response.steps {
                     self.state
@@ -192,6 +196,13 @@ impl LexorApp {
                 }
 
                 if let Some(graph) = worker_response.graph_nodes {
+                    if let Some(last_step) = graph.last() {
+                        let egui_graph = crate::graph::build_egui_graph(last_step);
+                        self.state
+                            .compiled_graphs
+                            .insert(worker_response.source_id, egui_graph);
+                    }
+
                     self.state
                         .reduction_graph
                         .insert(worker_response.source_id, graph);
@@ -234,9 +245,12 @@ impl LexorApp {
         }
     }
 
-    fn set_theme(&self, ctx: &egui::Context) {
+    #[expect(unused)]
+    fn set_theme(&self, _ctx: &egui::Context) {
         match self.state.style {
             // Catpuccin, Gruvbox, Compiler Explorer
+            Some(_) => todo!(),
+            None => todo!(),
         }
     }
 

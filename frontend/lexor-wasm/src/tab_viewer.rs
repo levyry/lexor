@@ -38,7 +38,7 @@ impl TabViewer for LexorTabViewer<'_> {
         match *tab {
             AppTabs::Welcome => welcome_view(ui),
             AppTabs::SkiSource(id) => self.ski_source_view(ui, id),
-            AppTabs::ReductionChain(source_id) => self.reduction_output_view(ui, source_id),
+            AppTabs::ReductionChain(source_id) => self.reduction_chain_view(ui, source_id),
             AppTabs::ReductionGraph(source_id) => self.reduction_graph_view(ui, source_id),
         }
     }
@@ -62,7 +62,11 @@ impl LexorTabViewer<'_> {
             let panel_id = egui::Id::new("source_top_panel").with(id);
 
             TopBottomPanel::top(panel_id).show_inside(ui, |ui| {
-                ui.horizontal_top(|ui| {
+                ui.horizontal(|ui| {
+                    ui.menu_button("Font size", |ui| {
+                        let font_size = self.state.settings.source_font_sizes.get_mut(&id).unwrap();
+                        ui.add(egui::Slider::new(font_size, 8.0..=30.0).integer());
+                    });
                     ui.menu_button("Add new...", |ui| {
                         if ui.button("Reduction Chain").clicked() {
                             self.state.push_msg(AppMessage::RequestChainOutput(id));
@@ -76,15 +80,30 @@ impl LexorTabViewer<'_> {
                 });
             });
 
-            let input = self.state.inputs.entry(id).or_default();
+            // ui.label("test");
 
-            if ui.text_edit_singleline(input).changed() {
-                self.state.last_edited_time.insert(id, ui.input(|i| i.time));
-            }
+            TopBottomPanel::bottom(egui::Id::new("source_bottom_panel").with(id)).show_inside(
+                ui,
+                |ui| {
+                    let input = self.state.inputs.entry(id).or_default();
+
+                    let input_response = egui::TextEdit::singleline(input)
+                        .font(egui::FontId::proportional(
+                            *self.state.settings.source_font_sizes.get(&id).unwrap(),
+                        ))
+                        .desired_width(f32::INFINITY)
+                        .show(ui)
+                        .response;
+
+                    if input_response.changed() {
+                        self.state.last_edited_time.insert(id, ui.input(|i| i.time));
+                    }
+                },
+            );
         });
     }
 
-    fn reduction_output_view(&self, ui: &mut Ui, source_id: SourceID) {
+    fn reduction_chain_view(&self, ui: &mut Ui, source_id: SourceID) {
         if let Some(response) = self.state.reduction_steps.get(&source_id)
             && let Some(steps) = response
         {
@@ -259,44 +278,6 @@ impl LexorTabViewer<'_> {
         }
     }
 
-    // #[must_use]
-    pub const fn get_redex_colors(
-        comb: VisualComb,
-    ) -> (egui::Color32, egui::Color32, egui::Color32) {
-        match comb {
-            VisualComb::S => (
-                // Red
-                egui::Color32::from_rgb(150, 50, 50),
-                egui::Color32::from_rgb(50, 20, 20),
-                egui::Color32::from_rgb(255, 100, 100),
-            ),
-            VisualComb::K => (
-                // Blue
-                egui::Color32::from_rgb(50, 100, 150),
-                egui::Color32::from_rgb(20, 40, 60),
-                egui::Color32::from_rgb(100, 150, 255),
-            ),
-            VisualComb::I => (
-                // Green
-                egui::Color32::from_rgb(50, 150, 50),
-                egui::Color32::from_rgb(20, 60, 20),
-                egui::Color32::from_rgb(100, 255, 100),
-            ),
-            VisualComb::B => (
-                // Orange
-                egui::Color32::from_rgb(150, 100, 50),
-                egui::Color32::from_rgb(60, 40, 20),
-                egui::Color32::from_rgb(255, 180, 100),
-            ),
-            VisualComb::C => (
-                // Purple
-                egui::Color32::from_rgb(150, 50, 150),
-                egui::Color32::from_rgb(60, 20, 60),
-                egui::Color32::from_rgb(255, 100, 255),
-            ),
-        }
-    }
-
     // SAFETY: The if conditions check for tokens.len(), so it should
     //         stay bounded. Same reasoning can show that the arithmetic
     //         expression will never underflow.
@@ -393,5 +374,43 @@ impl LexorTabViewer<'_> {
                 );
             }
         });
+    }
+
+    #[must_use]
+    pub const fn get_redex_colors(
+        comb: VisualComb,
+    ) -> (egui::Color32, egui::Color32, egui::Color32) {
+        match comb {
+            VisualComb::S => (
+                // Red
+                egui::Color32::from_rgb(150, 50, 50),
+                egui::Color32::from_rgb(50, 20, 20),
+                egui::Color32::from_rgb(255, 100, 100),
+            ),
+            VisualComb::K => (
+                // Blue
+                egui::Color32::from_rgb(50, 100, 150),
+                egui::Color32::from_rgb(20, 40, 60),
+                egui::Color32::from_rgb(100, 150, 255),
+            ),
+            VisualComb::I => (
+                // Green
+                egui::Color32::from_rgb(50, 150, 50),
+                egui::Color32::from_rgb(20, 60, 20),
+                egui::Color32::from_rgb(100, 255, 100),
+            ),
+            VisualComb::B => (
+                // Orange
+                egui::Color32::from_rgb(150, 100, 50),
+                egui::Color32::from_rgb(60, 40, 20),
+                egui::Color32::from_rgb(255, 180, 100),
+            ),
+            VisualComb::C => (
+                // Purple
+                egui::Color32::from_rgb(150, 50, 150),
+                egui::Color32::from_rgb(60, 20, 60),
+                egui::Color32::from_rgb(255, 100, 255),
+            ),
+        }
     }
 }

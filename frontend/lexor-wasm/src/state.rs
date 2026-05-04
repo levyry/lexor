@@ -4,7 +4,7 @@ use egui_dock::Style;
 use lexor_api::{GraphStep, ReductionStep, SourceID};
 use serde::{Deserialize, Serialize};
 
-use crate::{graph::LexorGraph, messages::AppMessage, tab_viewer::AppTabs};
+use crate::{graph::LexorGraph, messages::AppMessage, settings::Settings, tab_viewer::AppTabs};
 
 #[derive(Default, Serialize, Deserialize)]
 pub struct AppState {
@@ -16,6 +16,7 @@ pub struct AppState {
 
     pub last_assigned_id_inner: usize,
     pub style: Option<Style>,
+    pub settings: Settings,
 
     #[serde(skip)]
     pub messages: Rc<RefCell<Vec<AppMessage>>>,
@@ -36,6 +37,7 @@ impl AppState {
         let id = SourceID(id);
 
         self.inputs.insert(id, String::new());
+        self.settings.source_font_sizes.insert(id, 12.0);
 
         AppTabs::SkiSource(id)
     }

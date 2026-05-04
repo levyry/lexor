@@ -4,7 +4,6 @@ use std::{cell::RefCell, collections::HashMap, rc::Rc, vec};
 
 use crate::{
     messages::{AppMessage, SourceType},
-    settings::Settings,
     state::AppState,
     tab_viewer::AppTabs,
     tab_viewer::LexorTabViewer,
@@ -19,7 +18,6 @@ use serde::{Deserialize, Serialize};
 #[serde(default)]
 pub struct LexorApp {
     state: AppState,
-    settings: Settings,
     tree: DockState<AppTabs>,
     #[serde(skip)]
     worker: Option<WorkerBridge>,
@@ -53,7 +51,6 @@ impl Default for LexorApp {
             state,
             tree,
             worker,
-            settings: Settings::default(),
         }
     }
 }
@@ -78,6 +75,10 @@ impl eframe::App for LexorApp {
 impl LexorApp {
     #[must_use]
     pub fn new(cc: &eframe::CreationContext<'_>) -> Self {
+        let mut fonts = egui::FontDefinitions::default();
+        egui_phosphor::add_to_fonts(&mut fonts, egui_phosphor::Variant::Regular);
+        cc.egui_ctx.set_fonts(fonts);
+
         if let Some(storage) = cc.storage
             && let Some(state) = eframe::get_value(storage, eframe::APP_KEY)
         {

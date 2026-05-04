@@ -12,9 +12,9 @@ pub struct AppState {
     pub reduction_steps: HashMap<SourceID, Option<Vec<ReductionStep>>>,
     pub reduction_graph: HashMap<SourceID, Option<Vec<GraphStep>>>,
     pub last_edited_time: HashMap<SourceID, f64>,
-    pub last_assigned_key: usize,
     pub active_graph_step: HashMap<SourceID, usize>,
 
+    pub last_assigned_id_inner: usize,
     pub style: Option<Style>,
 
     #[serde(skip)]
@@ -27,23 +27,25 @@ pub struct AppState {
 impl AppState {
     pub fn new_ski_source(&mut self) -> AppTabs {
         let id = self
-            .last_assigned_key
+            .last_assigned_id_inner
             .checked_add(1)
             .expect("Ran out of ski source keys");
 
-        self.last_assigned_key = id;
+        self.last_assigned_id_inner = id;
+
+        let id = SourceID(id);
 
         self.inputs.insert(id, String::new());
 
         AppTabs::SkiSource(id)
     }
 
-    pub fn new_reduction_output(&mut self, id: usize) -> AppTabs {
+    pub fn new_reduction_output(&mut self, id: SourceID) -> AppTabs {
         self.reduction_steps.insert(id, None);
         AppTabs::ReductionChain(id)
     }
 
-    pub fn new_graph_output(&mut self, id: usize) -> AppTabs {
+    pub fn new_graph_output(&mut self, id: SourceID) -> AppTabs {
         self.reduction_graph.insert(id, None);
         AppTabs::ReductionGraph(id)
     }

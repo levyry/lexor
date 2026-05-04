@@ -142,7 +142,7 @@ impl LexorTabViewer<'_> {
         self.graph_view(ui, source_id, current_step);
     }
 
-    fn graph_view(&mut self, ui: &mut Ui, source_id: usize, current_step: usize) {
+    fn graph_view(&mut self, ui: &mut Ui, source_id: SourceID, current_step: usize) {
         if let Some(graph_cache) = self.state.compiled_graphs.get_mut(&source_id)
             && let Some(graph) = graph_cache.get_mut(&current_step)
         {
@@ -206,7 +206,7 @@ impl LexorTabViewer<'_> {
         }
     }
 
-    fn graph_controls_view(&self, ui: &mut Ui, source_id: usize, mut current_step: usize) {
+    fn graph_controls_view(&self, ui: &mut Ui, source_id: SourceID, mut current_step: usize) {
         if let Some(response) = self.state.reduction_graph.get(&source_id)
             && let Some(graph_history) = response
             && !graph_history.is_empty()

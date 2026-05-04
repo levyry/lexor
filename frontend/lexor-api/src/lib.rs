@@ -1,15 +1,16 @@
-use lexor_reducer::{EngineView, NF, NodeRole, ReductionStrat, core::node::NodeComb};
+use lexor_reducer::{EngineView, NF, ReductionStrat, core::node::NodeComb};
 use serde::{Deserialize, Serialize};
 
 use crate::{
     graph::NodeData,
-    visual::{RenderToken, TokenStyle, VisualComb},
+    visual::{RenderToken, VisualComb},
 };
 
 pub mod graph;
+pub mod source_id;
 pub mod visual;
 
-pub type SourceID = usize;
+pub use source_id::SourceID;
 
 #[derive(Debug, Serialize, Deserialize, Clone, PartialEq, Eq, PartialOrd, Ord, Hash)]
 pub struct WorkerRequest {
@@ -24,7 +25,7 @@ pub type GraphStep = Vec<NodeData>;
 
 #[derive(Debug, Serialize, Deserialize, Clone, PartialEq, Eq, PartialOrd, Ord, Hash)]
 pub struct WorkerResponse {
-    pub source_id: usize,
+    pub source_id: SourceID,
     pub steps: Option<Vec<ReductionStep>>,
     pub graph_nodes: Option<Vec<GraphStep>>,
 }
@@ -51,17 +52,9 @@ pub fn process_job(req_json: &str) -> String {
             let mut step_tokens = vec![];
 
             view.traverse(|text, role, key| {
-                let style = match role {
-                    NodeRole::Normal => TokenStyle::Normal,
-                    NodeRole::RedexHead(comb) => TokenStyle::RedexHead(map_comb_to_visual(comb)),
-                    NodeRole::RedexArg(comb, idx) => {
-                        TokenStyle::RedexBody(map_comb_to_visual(comb), idx)
-                    }
-                };
-
                 step_tokens.push(RenderToken {
                     text: text.to_owned(),
-                    style,
+                    style: role.into(),
                     node_key: key,
                 });
             });

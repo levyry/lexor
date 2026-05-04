@@ -211,7 +211,12 @@ impl LexorApp {
                 self.state.inputs.remove(&source_id);
                 self.state.reduction_steps.remove(&source_id);
                 self.state.compiled_graphs.remove(&source_id);
-                self.state.last_assigned_key = *self.state.inputs.keys().max().unwrap_or(&0usize);
+                self.state.last_assigned_id_inner = self
+                    .state
+                    .inputs
+                    .keys()
+                    .max()
+                    .map_or(0usize, |source_id| source_id.0);
             }
             AppMessage::WorkerJobCompleted(worker_response) => {
                 let source_id = worker_response.source_id;

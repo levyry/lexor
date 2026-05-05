@@ -93,10 +93,42 @@
 \def\bibInSelf#1{In u\H{o}: }
 \csname bibOverride\endcsname
 
-\bibitem{eco}
-Umberto Eco:
-\bibNewBlock {\em Hogyan írjunk szakdolgozatot?}
-\bibNewBlock 2000, Kairosz Kiadó.
-\bibNewBlock ISBN 9639137537.
+\bibitem{curryGrundlagenKombinatorischenLogik1930}
+H.~B. Curry:
+\bibNewBlock {Grundlagen der Kombinatorischen Logik}.
+\bibNewBlock {\em American Journal of Mathematics}, 52. \'evf. (1930) 3. sz., 509--536.~p.
+\bibNewBlock ISSN 0002-9327.
+
+\bibitem{FlatteningASTsOther}
+Flattening {{ASTs}} (and {{Other Compiler Data Structures}}).
+\bibNewBlock
+\bibUrll{URL} >https://www.cs.cornell.edu/~asampson/blog/flattening.html>.
+
+\bibitem{LambdaNotFour}
+Lambda is not a four letter word - {{Implementing}} a {{Functional Language}} with {{Graph Reduction}}.
+\bibNewBlock
+\bibUrll{URL} >https://thma.github.io/posts/2021-12-27-Implementing-a-functional- language-with-Graph-Reduction.html>.
+
+\bibitem{schoenfinkelUeberBausteineMathematischen1924}
+M.~Sch\"onfinkel:
+\bibNewBlock {\"Uber die Bausteine der mathematischen Logik}.
+\bibNewBlock {\em Mathematische Annalen}, 92. \'evf. (1924.\ szep{\-}tem{\-}ber) 3-4. sz., 305--316.~p.
+\bibNewBlock ISSN 0025-5831, 1432-1807.
+
+\bibitem{smullyanMockMockingbirdOther2000}
+Raymond~M. Smullyan:
+\bibNewBlock {\em To {{Mock}} a {{Mockingbird}}: {{And Other Logic Puzzles Including}} an {{Amazing Adventure}} in {{Combinatory Logic}}}.
+\bibNewBlock 2000, Oxford University Press.
+\bibNewBlock ISBN 978-0-19-280142-5.
+
+\bibitem{wolframCombinatorsCentennialView2020}
+Stephen Wolfram:
+\bibNewBlock Combinators: {{A Centennial View}}.
+\bibNewBlock {\em Stephen Wolfram Writings}, 2020.\ de{\-}cem{\-}ber.
+
+\bibitem{wolframCombinatorsStoryComputation2020}
+Stephen Wolfram:
+\bibNewBlock Combinators and the {{Story}} of {{Computation}}.
+\bibNewBlock {\em Stephen Wolfram Writings}, 2020.\ de{\-}cem{\-}ber.
 
 \end{thebibliography}

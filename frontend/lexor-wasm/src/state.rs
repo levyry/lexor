@@ -1,32 +1,29 @@
 use std::{cell::RefCell, collections::HashMap, rc::Rc};
 
 use egui_dock::Style;
-use lexor_api::{GraphStep, ReductionStep, SourceID};
+use lexor_api::SourceID;
 use serde::{Deserialize, Serialize};
 
-use crate::{graph::LexorGraph, messages::AppMessage, settings::Settings, tab_viewer::AppTabs};
+use crate::{
+    messages::AppMessage,
+    settings::Settings,
+    source::{Source, SourceKind},
+    tab_viewer::AppTabs,
+};
 
 #[derive(Default, Serialize, Deserialize)]
 pub struct AppState {
-    pub inputs: HashMap<SourceID, String>,
-    pub reduction_steps: HashMap<SourceID, Option<Vec<ReductionStep>>>,
-    pub reduction_graph: HashMap<SourceID, Option<Vec<GraphStep>>>,
-    pub last_edited_time: HashMap<SourceID, f64>,
-    pub active_graph_step: HashMap<SourceID, usize>,
-
+    pub sources: HashMap<SourceID, Source>,
     pub last_assigned_id_inner: usize,
     pub style: Option<Style>,
     pub settings: Settings,
 
     #[serde(skip)]
     pub messages: Rc<RefCell<Vec<AppMessage>>>,
-
-    #[serde(skip)]
-    pub compiled_graphs: HashMap<SourceID, HashMap<usize, LexorGraph>>,
 }
 
 impl AppState {
-    pub fn new_ski_source(&mut self) -> AppTabs {
+    pub fn new_source(&mut self, kind: SourceKind) -> AppTabs {
         let id = self
             .last_assigned_id_inner
             .checked_add(1)
@@ -36,20 +33,14 @@ impl AppState {
 
         let id = SourceID(id);
 
-        self.inputs.insert(id, String::new());
+        self.sources.insert(id, Source::new(SourceKind::Ski));
+
         self.settings.source_font_sizes.insert(id, 12.0);
 
-        AppTabs::SkiSource(id)
-    }
-
-    pub fn new_reduction_output(&mut self, id: SourceID) -> AppTabs {
-        self.reduction_steps.insert(id, None);
-        AppTabs::ReductionChain(id)
-    }
-
-    pub fn new_graph_output(&mut self, id: SourceID) -> AppTabs {
-        self.reduction_graph.insert(id, None);
-        AppTabs::ReductionGraph(id)
+        match kind {
+            SourceKind::Ski => AppTabs::SkiSource(id),
+            SourceKind::Lambda => AppTabs::LambdaSource(id),
+        }
     }
 
     pub fn push_msg(&self, msg: AppMessage) {

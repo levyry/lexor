@@ -3,10 +3,11 @@
 use std::{cell::RefCell, collections::HashMap, rc::Rc, vec};
 
 use crate::{
-    messages::{AppMessage, SourceType},
+    graph::build_egui_graph,
+    messages::AppMessage,
+    source::SourceKind,
     state::AppState,
-    tab_viewer::AppTabs,
-    tab_viewer::LexorTabViewer,
+    tab_viewer::{AppTabs, LexorTabViewer},
     worker_bridge::WorkerBridge,
 };
 use egui::{CentralPanel, Frame, TopBottomPanel, Ui};
@@ -26,11 +27,11 @@ pub struct LexorApp {
 impl Default for LexorApp {
     fn default() -> Self {
         let mut state = AppState::default();
-        let ski_tab = state.new_ski_source();
+        let ski_tab = state.new_source(SourceKind::Ski);
         let AppTabs::SkiSource(id) = ski_tab else {
             unreachable!()
         };
-        let reduction_tab = state.new_reduction_output(id);
+        let reduction_tab = AppTabs::ReductionChain(id);
 
         let mut tree = DockState::new(vec![AppTabs::Welcome]);
 
@@ -92,7 +93,7 @@ impl LexorApp {
         ui.menu_button("Add", |ui| {
             if ui.button("SKI source").clicked() {
                 self.state
-                    .push_msg(AppMessage::RequestNewSource(SourceType::Ski));
+                    .push_msg(AppMessage::RequestNewSource(SourceKind::Ski));
                 ui.close();
             }
         });
@@ -128,16 +129,12 @@ impl LexorApp {
 
     fn apply_message(&mut self, msg: AppMessage) {
         match msg {
-            AppMessage::RequestNewSource(SourceType::Ski) => {
-                let tab = self.state.new_ski_source();
+            AppMessage::RequestNewSource(kind) => {
+                let tab = self.state.new_source(kind);
                 self.spawn_tab(tab);
-            }
-            AppMessage::RequestNewSource(SourceType::Lambda) => {
-                todo!()
             }
             AppMessage::RequestChainOutput(source_id) => {
-                let tab = self.state.new_reduction_output(source_id);
-                self.spawn_tab(tab);
+                self.spawn_tab(AppTabs::ReductionChain(source_id));
 
                 // Send a reduction job so that if the user opened this panel
                 // after already having typed in the input, it populates
@@ -145,8 +142,7 @@ impl LexorApp {
                 self.state.push_msg(AppMessage::SendReductionJob(source_id));
             }
             AppMessage::RequestGraphOutput(source_id) => {
-                let tab = self.state.new_graph_output(source_id);
-                self.spawn_tab(tab);
+                self.spawn_tab(AppTabs::ReductionGraph(source_id));
 
                 // Send a reduction job so that if the user opened this panel
                 // after already having typed in the input, it populates
@@ -154,46 +150,43 @@ impl LexorApp {
                 self.state.push_msg(AppMessage::SendReductionJob(source_id));
             }
             AppMessage::SetGraphStep(source_id, step_idx) => {
-                let is_active = self.state.active_graph_step.get(&source_id) == Some(&step_idx);
+                let Some(source) = self.state.sources.get_mut(&source_id) else {
+                    return;
+                };
 
-                let is_compiled = self
-                    .state
-                    .compiled_graphs
-                    .get(&source_id)
-                    .is_some_and(|c| c.contains_key(&step_idx));
+                let is_active = source.is_at_step(step_idx);
+
+                let is_compiled = source.is_cached_for(step_idx);
 
                 if is_active && is_compiled {
                     return;
                 }
 
-                self.state.active_graph_step.insert(source_id, step_idx);
+                source.active_graph_step = step_idx;
 
-                if let Some(response) = self.state.reduction_graph.get(&source_id)
-                    && let Some(graph_history) = response
+                if let Some(graph_history) = &source.reduction_graph
                     && let Some(step_data) = graph_history.get(step_idx)
                 {
-                    let cache = self.state.compiled_graphs.entry(source_id).or_default();
-
-                    cache
+                    source
+                        .compiled_graphs
                         .entry(step_idx)
                         .or_insert_with(|| crate::graph::build_egui_graph(step_data));
                 }
             }
             AppMessage::SendReductionJob(source_id) => {
-                let input = self
-                    .state
-                    .inputs
-                    .get(&source_id)
-                    .expect("SourceID not found while trying to run reduction");
-
-                self.state.reduction_steps.remove(&source_id);
-
                 let wants_steps = self.is_steps_open_for(source_id);
                 let wants_graph = self.is_graph_open_for(source_id);
 
+                let Some(source) = self.state.sources.get_mut(&source_id) else {
+                    return;
+                };
+
+                source.reduction_chain = None;
+                source.reduction_graph = None;
+
                 let request = WorkerRequest {
                     source_id,
-                    code: input.clone(),
+                    code: source.contents.clone(),
                     wants_steps,
                     wants_graph,
                 };
@@ -209,45 +202,24 @@ impl LexorApp {
                     }
                     _ => true,
                 });
-                self.state.inputs.remove(&source_id);
-                self.state.reduction_steps.remove(&source_id);
-                self.state.compiled_graphs.remove(&source_id);
-                self.state.last_assigned_id_inner = self
-                    .state
-                    .inputs
-                    .keys()
-                    .max()
-                    .map_or(0usize, |source_id| source_id.0);
+                self.state.sources.remove(&source_id);
             }
             AppMessage::WorkerJobCompleted(worker_response) => {
-                let source_id = worker_response.source_id;
+                let Some(source) = self.state.sources.get_mut(&worker_response.source_id) else {
+                    return;
+                };
 
-                if let Some(computed_steps) = worker_response.steps {
-                    self.state
-                        .reduction_steps
-                        .insert(source_id, Some(computed_steps));
-                }
+                source.active_graph_step = 0;
+                source.reduction_chain = worker_response.steps;
+                source.reduction_graph = worker_response.graph_nodes;
+                source.compiled_graphs = HashMap::new();
 
-                if let Some(graph_history) = worker_response.graph_nodes {
-                    const DEFAULT_STEP_IDX: usize = 0;
-                    self.state
-                        .active_graph_step
-                        .insert(source_id, DEFAULT_STEP_IDX);
-
-                    // Remove stale data
-                    self.state.compiled_graphs.remove(&source_id);
-
-                    if let Some(first_step) = graph_history.get(DEFAULT_STEP_IDX) {
-                        let egui_graph = crate::graph::build_egui_graph(first_step);
-
-                        let mut graph_cache = HashMap::new();
-                        graph_cache.insert(DEFAULT_STEP_IDX, egui_graph);
-
-                        self.state.compiled_graphs.insert(source_id, graph_cache);
-                    }
-                    self.state
-                        .reduction_graph
-                        .insert(source_id, Some(graph_history));
+                // Precompile the first step
+                if let Some(graphs) = &source.reduction_graph
+                    && let Some(first_step) = graphs.first()
+                {
+                    let egui_graph = build_egui_graph(first_step);
+                    source.compiled_graphs.insert(0, egui_graph);
                 }
             }
         }
@@ -270,14 +242,12 @@ impl LexorApp {
         let debounce_delay = 0.5;
         let mut to_recompile = Vec::new();
 
-        self.state.last_edited_time.retain(|&id, &mut last_time| {
-            if current_time - last_time > debounce_delay {
+        for (&id, source) in &mut self.state.sources {
+            if current_time - source.last_edited_time > debounce_delay {
                 to_recompile.push(id);
-                false
-            } else {
-                true
+                source.last_edited_time = f64::INFINITY;
             }
-        });
+        }
 
         for id in to_recompile {
             self.state.push_msg(AppMessage::SendReductionJob(id));

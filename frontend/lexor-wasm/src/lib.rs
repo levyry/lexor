@@ -6,6 +6,7 @@ pub mod state;
 pub mod tab_viewer;
 pub mod worker_bridge;
 pub mod node_style;
+pub mod source;
 
 #[cfg(target_arch = "wasm32")]
 use wasm_bindgen::prelude::*;

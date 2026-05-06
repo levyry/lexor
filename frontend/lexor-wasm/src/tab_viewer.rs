@@ -1,6 +1,4 @@
-use std::time::Duration;
-
-use egui::{TopBottomPanel, Ui, WidgetText};
+use egui::{Label, TopBottomPanel, Ui, WidgetText};
 use egui_dock::{TabViewer, tab_viewer::OnCloseResponse};
 use egui_graphs::{SettingsInteraction, SettingsNavigation};
 use lexor_api::{
@@ -42,7 +40,7 @@ impl TabViewer for LexorTabViewer<'_> {
         match *tab {
             AppTabs::Welcome => welcome_view(ui),
             AppTabs::SkiSource(id) => self.ski_source_view(ui, id),
-            AppTabs::LambdaSource(id) => todo!(),
+            AppTabs::LambdaSource(_id) => todo!(),
             AppTabs::ReductionChain(id) => self.reduction_chain_view(ui, id),
             AppTabs::ReductionGraph(id) => self.reduction_graph_view(ui, id),
         }
@@ -85,7 +83,18 @@ impl LexorTabViewer<'_> {
                 });
             });
 
-            // ui.label("test");
+            ui.vertical_centered(|ui| {
+                ui.label("You can toggle which combinators you want to use here.");
+                for comb in [
+                    (VisualComb::S, "a -> b -> c -> a c(b c)"),
+                    (VisualComb::K, "a -> b -> a"),
+                    (VisualComb::I, "a -> a"),
+                    (VisualComb::B, "a -> b -> c -> a(b c)"),
+                    (VisualComb::C, "a -> b -> c -> a c b"),
+                ] {
+                    ui.add(Label::new(format!("{}:\t{}", comb.0, comb.1)).halign(egui::Align::Min));
+                }
+            });
 
             TopBottomPanel::bottom(egui::Id::new("source_bottom_panel").with(id)).show_inside(
                 ui,
@@ -214,7 +223,7 @@ impl LexorTabViewer<'_> {
             ui.add(&mut graph_view);
 
             // TODO: Find a way to not have to reset layout every frame
-            egui_graphs::reset_layout::<egui_graphs::LayoutStateHierarchical>(ui, id.clone());
+            egui_graphs::reset_layout::<egui_graphs::LayoutStateHierarchical>(ui, id);
             ui.ctx().request_repaint();
         } else {
             let Some(source) = self.state.sources.get(&source_id) else {

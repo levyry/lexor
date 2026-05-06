@@ -36,12 +36,12 @@ impl NodeComb {
 
 impl fmt::Display for NodeComb {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-        match self {
-            Self::S => write!(f, "S"),
-            Self::K => write!(f, "K"),
-            Self::I => write!(f, "I"),
-            Self::B => write!(f, "B"),
-            Self::C => write!(f, "C"),
-        }
+        f.write_str(match self {
+            Self::S => "S",
+            Self::K => "K",
+            Self::I => "I",
+            Self::B => "B",
+            Self::C => "C",
+        })
     }
 }

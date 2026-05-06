@@ -1,3 +1,5 @@
+use core::fmt;
+
 use lexor_reducer::{
     NodeRole,
     core::node::{NodeComb, NodeKey},
@@ -13,6 +15,18 @@ pub enum VisualComb {
     I,
     B,
     C,
+}
+
+impl fmt::Display for VisualComb {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        f.write_str(match *self {
+            Self::S => "S",
+            Self::K => "K",
+            Self::I => "I",
+            Self::B => "B",
+            Self::C => "C",
+        })
+    }
 }
 
 impl From<NodeComb> for VisualComb {

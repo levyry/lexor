@@ -74,25 +74,18 @@ impl BitAnd for BulkCom {
 
 impl fmt::Display for BulkCom {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
-        let result = match self {
-            Self::S => String::from("S"),
-            Self::I => String::from("I"),
-            Self::C => String::from("C"),
-            Self::K => String::from("K"),
-            Self::B => String::from("B"),
-            Self::App(lhs, rhs) => {
-                if let Self::App(_, _) = **rhs {
-                    format!("{lhs}({rhs})")
-                } else {
-                    format!("{lhs}{rhs}")
-                }
-            }
-            Self::Sn(n) => format!("S_{n}"),
-            Self::Bn(n) => format!("B_{n}"),
-            Self::Cn(n) => format!("C_{n}"),
-        };
-
-        write!(f, "{result}")
+        match self {
+            Self::S => write!(f, "S"),
+            Self::I => write!(f, "I"),
+            Self::C => write!(f, "C"),
+            Self::K => write!(f, "K"),
+            Self::B => write!(f, "B"),
+            Self::App(lhs, rhs) if let Self::App(_, _) = **rhs => write!(f, "{lhs}({rhs})"),
+            Self::App(lhs, rhs) => write!(f, "{lhs}{rhs}"),
+            Self::Sn(n) => write!(f, "S_{n}"),
+            Self::Bn(n) => write!(f, "B_{n}"),
+            Self::Cn(n) => write!(f, "C_{n}"),
+        }
     }
 }
 

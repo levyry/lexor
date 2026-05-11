@@ -13,8 +13,8 @@ use egui::{CentralPanel, Frame, TopBottomPanel, Ui};
 use egui_dock::{DockArea, DockState, NodeIndex, Style};
 use lexor_api::{
     ApiStrategy, SourceID,
-    request::{WorkerRequest, WorkerRequestState},
-    response::WorkerResponseState,
+    request::{ReductionRequest, ReductionRequestState},
+    response::ReductionResponseState,
     source_id::SourceKind,
     visual::VisualComb,
 };
@@ -188,10 +188,10 @@ impl LexorApp {
                 source.reduction_chain = None;
                 source.reduction_graph = None;
 
-                let request = WorkerRequest {
+                let request = ReductionRequest {
                     source_id,
                     strategy: ApiStrategy::Ski(()),
-                    state: WorkerRequestState::Ski {
+                    state: ReductionRequestState::Ski {
                         wants_steps,
                         wants_graph,
                     },
@@ -199,7 +199,7 @@ impl LexorApp {
                 };
 
                 if let Some(bridge) = &self.worker {
-                    bridge.send_job(&request);
+                    bridge.send_reduction_job(request);
                 }
             }
             AppMessage::SendLambdaReductionJob(source_id) => {
@@ -209,15 +209,15 @@ impl LexorApp {
 
                 source.lambda_output = None;
 
-                let request = WorkerRequest {
+                let request = ReductionRequest {
                     source_id,
                     strategy: ApiStrategy::Lambda(source.lambda_strategy),
-                    state: WorkerRequestState::Lambda { placeholder: false },
+                    state: ReductionRequestState::Lambda { placeholder: false },
                     input: source.lambda_input.clone(),
                 };
 
                 if let Some(bridge) = &self.worker {
-                    bridge.send_job(&request);
+                    bridge.send_reduction_job(request);
                 }
             }
             AppMessage::CloseSourceTab(source_id) => {
@@ -229,7 +229,7 @@ impl LexorApp {
                 });
                 self.state.sources.remove(&source_id);
             }
-            AppMessage::WorkerJobCompleted(worker_response) => {
+            AppMessage::ReductionJobCompleted(worker_response) => {
                 let Some(source) = self.state.sources.get_mut(&worker_response.source_id) else {
                     return;
                 };
@@ -241,7 +241,7 @@ impl LexorApp {
 
                 source.remove_error();
 
-                if let WorkerResponseState::Ski { steps, graph_nodes } = worker_response.state {
+                if let ReductionResponseState::Ski { steps, graph_nodes } = worker_response.state {
                     source.reduction_chain = steps;
                     source.reduction_graph = graph_nodes;
                     source.active_graph_step = 0;
@@ -253,7 +253,7 @@ impl LexorApp {
                         let egui_graph = build_egui_graph(first_step);
                         source.compiled_graphs.insert(0, egui_graph);
                     }
-                } else if let WorkerResponseState::Lambda { output } = worker_response.state {
+                } else if let ReductionResponseState::Lambda { output } = worker_response.state {
                     source.lambda_output = output;
                 }
             }
@@ -274,11 +274,20 @@ impl LexorApp {
                 source.last_edited_time = time;
             }
             AppMessage::ConvertSkiToLambda(source_id) => {
+                let Some(source) = self.state.sources.get(&source_id) else {
+                    return;
+                };
+
+                if let Some(bridge) = &self.worker {
+                    bridge.send_conversion_job(source_id, &source.ski_input);
+                }
+            }
+            AppMessage::ConversionCompleted(source_id, result) => {
                 let Some(source) = self.state.sources.get_mut(&source_id) else {
                     return;
                 };
 
-                source.converted_lambda_output = Some(String::from("(\\x.x)"));
+                source.converted_lambda_output = Some(result);
             }
         }
     }

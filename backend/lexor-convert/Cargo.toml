@@ -8,6 +8,7 @@ description.workspace = true
 [dependencies]
 lower = { workspace = true }
 lexor-core = { workspace = true }
+lexor-parser = { workspace = true }
 
 [lints]
 workspace = true

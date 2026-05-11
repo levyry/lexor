@@ -1596,6 +1596,7 @@ checksum = "e2db585e1d738fc771bf08a151420d3ed193d9d895a36df7f6f8a9456b911ddc"
 name = "lexor-api"
 version = "0.1.0"
 dependencies = [
+ "lexor-convert",
  "lexor-reducer",
  "serde",
  "serde_json",
@@ -1607,6 +1608,7 @@ name = "lexor-convert"
 version = "0.1.0"
 dependencies = [
  "lexor-core",
+ "lexor-parser",
  "lower",
 ]
 

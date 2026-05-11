@@ -9,7 +9,6 @@
 ### Frontend
 
 - toggle reduction chain coloring
-- button for changing reduction strategy
 - themes
 
 ### Backend

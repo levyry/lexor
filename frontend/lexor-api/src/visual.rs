@@ -6,8 +6,6 @@ use lexor_reducer::{
 };
 use serde::{Deserialize, Serialize};
 
-use crate::map_comb_to_visual;
-
 #[derive(Debug, Clone, Copy, PartialEq, Eq, PartialOrd, Ord, Hash, Serialize, Deserialize)]
 pub enum VisualComb {
     S,
@@ -52,8 +50,8 @@ impl From<NodeRole> for TokenStyle {
     fn from(value: NodeRole) -> Self {
         match value {
             NodeRole::Normal => Self::Normal,
-            NodeRole::RedexHead(comb) => Self::RedexHead(map_comb_to_visual(comb)),
-            NodeRole::RedexArg(comb, idx) => Self::RedexBody(map_comb_to_visual(comb), idx),
+            NodeRole::RedexHead(comb) => Self::RedexHead(comb.into()),
+            NodeRole::RedexArg(comb, idx) => Self::RedexBody(comb.into(), idx),
         }
     }
 }

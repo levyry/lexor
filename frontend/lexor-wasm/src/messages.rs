@@ -1,4 +1,4 @@
-use lexor_api::{SourceID, response::WorkerResponse, source_id::SourceKind, visual::VisualComb};
+use lexor_api::{SourceID, response::ReductionResponse, source_id::SourceKind, visual::VisualComb};
 use serde::{Deserialize, Serialize};
 
 #[derive(Clone, Debug, PartialEq, Serialize, Deserialize)]
@@ -9,8 +9,9 @@ pub enum AppMessage {
     SendSkiReductionJob(SourceID),
     SendLambdaReductionJob(SourceID),
     SetGraphStep(SourceID, usize),
-    WorkerJobCompleted(WorkerResponse),
+    ReductionJobCompleted(ReductionResponse),
     CloseSourceTab(SourceID),
     AddLambdaInput(SourceID, VisualComb, f64),
     ConvertSkiToLambda(SourceID),
+    ConversionCompleted(SourceID, String),
 }

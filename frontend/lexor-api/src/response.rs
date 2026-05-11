@@ -6,14 +6,14 @@ pub type ReductionStep = Vec<RenderToken>;
 pub type GraphStep = Vec<NodeData>;
 
 #[derive(Debug, Serialize, Deserialize, Clone, PartialEq, Eq, PartialOrd, Ord, Hash)]
-pub struct WorkerResponse {
+pub struct ReductionResponse {
     pub source_id: SourceID,
-    pub state: WorkerResponseState,
+    pub state: ReductionResponseState,
     pub error: Option<String>,
 }
 
 #[derive(Debug, Serialize, Deserialize, Clone, PartialEq, Eq, PartialOrd, Ord, Hash)]
-pub enum WorkerResponseState {
+pub enum ReductionResponseState {
     Ski {
         steps: Option<Vec<ReductionStep>>,
         graph_nodes: Option<Vec<GraphStep>>,

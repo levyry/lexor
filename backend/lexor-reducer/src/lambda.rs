@@ -11,7 +11,10 @@ pub enum LambdaEvalError {
     ConversionError(String),
 }
 
-pub fn eval(input: &str, strat: LambdaReductionStrategy) -> Result<String, LambdaEvalError> {
+pub fn evaluate_lambda(
+    input: &str,
+    strat: LambdaReductionStrategy,
+) -> Result<String, LambdaEvalError> {
     let parsed = lambda_parser::chumsky_parse(input)
         .map_err(|_| LambdaEvalError::ParseError(String::from("Invalid expression!")))?;
 

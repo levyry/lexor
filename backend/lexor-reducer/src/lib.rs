@@ -11,7 +11,7 @@ pub use engineview::EngineGraphNodeKind;
 pub use engineview::EngineView;
 pub use engineview::NodeRole;
 pub use graphred::{NF, ReductionError, ReductionStrat, WHNF};
-pub use lambda::{LambdaEvalError, eval};
+pub use lambda::{LambdaEvalError, evaluate_lambda};
 pub use lexor_core::de_bruijn::LambdaReductionStrategy;
 
 mod seal {

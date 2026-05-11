@@ -1,7 +1,7 @@
 use std::{cell::RefCell, rc::Rc};
 
-use lexor_api::request::WorkerRequest;
-use lexor_api::response::WorkerResponse;
+use lexor_api::{SourceID, WorkerResult};
+use lexor_api::{WorkerTask, request::ReductionRequest};
 use wasm_bindgen::{JsCast, prelude::Closure};
 
 use crate::messages::AppMessage;
@@ -21,28 +21,22 @@ impl WorkerBridge {
 
         #[allow(clippy::as_conversions)]
         let callback = Closure::wrap(Box::new(move |event: web_sys::MessageEvent| {
-            if let Some(json_str) = event.data().as_string() {
-                match serde_json::from_str::<WorkerResponse>(&json_str) {
-                    Ok(response) => {
+            if let Some(json_str) = event.data().as_string()
+                && let Ok(worker_result) = serde_json::from_str::<WorkerResult>(&json_str)
+            {
+                match worker_result {
+                    WorkerResult::Reduction(response) => {
                         queue
                             .borrow_mut()
-                            .push(AppMessage::WorkerJobCompleted(response));
-
-                        ctx.request_repaint();
+                            .push(AppMessage::ReductionJobCompleted(response));
                     }
-                    Err(err) => {
-                        #[cfg(target_arch = "wasm32")]
-                        web_sys::console::error_1(
-                            &format!(
-                                "DESERIALIZATION PANIC!\nError: {}\nJSON Received: {}",
-                                err, json_str
-                            )
-                            .into(),
-                        );
-                        #[cfg(not(target_arch = "wasm32"))]
-                        unreachable!("{err}")
+                    WorkerResult::Conversion { source_id, result } => {
+                        queue
+                            .borrow_mut()
+                            .push(AppMessage::ConversionCompleted(source_id, result));
                     }
                 }
+                ctx.request_repaint();
             }
         }) as Box<dyn FnMut(_)>);
 
@@ -52,11 +46,28 @@ impl WorkerBridge {
         Self { worker }
     }
 
-    pub fn send_job(&self, request: &WorkerRequest) {
-        let json = serde_json::to_string(&request)
-            .expect("Failed to serialize into JSON when sending request");
+    pub fn send_reduction_job(&self, request: ReductionRequest) {
+        let task = WorkerTask::Reduction(request);
+
+        let json =
+            serde_json::to_string(&task).expect("WorkerTask JSON serialization failed (reduction)");
+
         self.worker
             .post_message(&json.into())
-            .expect("Worker returned Err");
+            .expect("Failed at posting message");
+    }
+
+    pub fn send_conversion_job(&self, id: SourceID, input: &str) {
+        let task = WorkerTask::Conversion {
+            source_id: id,
+            input: String::from(input),
+        };
+
+        let json = serde_json::to_string(&task)
+            .expect("WorkerTask JSON serialization failed (conversion)");
+
+        self.worker
+            .post_message(&json.into())
+            .expect("Failed at posting message");
     }
 }

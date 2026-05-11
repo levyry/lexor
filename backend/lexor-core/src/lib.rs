@@ -7,8 +7,10 @@ TODO: Finish once done with crate. Add example.
 [Lambda calculus]: https://en.wikipedia.org/wiki/Lambda_calculus
 [Combinator]: https://en.wikipedia.org/wiki/Combinatory_logic
 */
+#![feature(iter_advance_by)]
 
 pub mod de_bruijn;
+mod name_generator;
 
 pub mod lambda {
     /*!
@@ -20,7 +22,7 @@ pub mod lambda {
 
     use core::fmt;
 
-    use crate::de_bruijn::DeBruijn;
+    use crate::{combinator::Combinator, de_bruijn::DeBruijn, name_generator::NameGenerator};
 
     /// Represents an untyped lambda calculus term (not using De Bruijn indexing).
     #[derive(Clone, Debug, PartialEq, Eq)]
@@ -51,11 +53,7 @@ pub mod lambda {
             fn convert(
                 db: DeBruijn,
                 scope: &mut Vec<String>,
-                counter: usize,
-                alphabet: &mut std::iter::Chain<
-                    std::ops::RangeInclusive<char>,
-                    std::ops::RangeInclusive<char>,
-                >,
+                alphabet: &mut impl Iterator<Item = String>,
             ) -> Result<Lambda, String> {
                 match db {
                     DeBruijn::BVar(index) => {
@@ -73,29 +71,60 @@ pub mod lambda {
 
                     DeBruijn::Abs(body) => {
                         let name = alphabet.next().ok_or("Ran out of names")?;
-                        let new_counter = counter.saturating_add(1);
 
-                        scope.push(name.to_string());
+                        scope.push(name.clone());
 
-                        let body_lambda_expr = convert(*body, scope, new_counter, alphabet)?;
+                        let body_lambda_expr = convert(*body, scope, alphabet)?;
 
                         scope.pop();
 
-                        Ok(Lambda::Abs(name.to_string(), Box::new(body_lambda_expr)))
+                        Ok(Lambda::Abs(name, Box::new(body_lambda_expr)))
                     }
                     DeBruijn::App(lhs, rhs) => Ok(Lambda::App(
-                        Box::new(convert(*lhs, scope, counter, alphabet)?),
-                        Box::new(convert(*rhs, scope, counter, alphabet)?),
+                        Box::new(convert(*lhs, scope, alphabet)?),
+                        Box::new(convert(*rhs, scope, alphabet)?),
                     )),
                 }
             }
 
-            convert(
-                value,
-                &mut Vec::<String>::new(),
-                0,
-                &mut ('a'..='z').chain('A'..='Z'),
-            )
+            convert(value, &mut Vec::new(), &mut NameGenerator::new())
+        }
+    }
+
+    impl From<Combinator> for Lambda {
+        fn from(value: Combinator) -> Self {
+            macro_rules! var {
+                ($name:ident) => {
+                    Lambda::Var(stringify!($name).to_string())
+                };
+            }
+
+            macro_rules! abs {
+                ($arg:ident, $body:expr) => {
+                    Lambda::Abs(stringify!($arg).to_string(), Box::new($body))
+                };
+            }
+
+            macro_rules! app {
+                ($lhs:expr, $rhs:expr) => {
+                    Lambda::App(Box::new($lhs), Box::new($rhs))
+                };
+            }
+
+            match value {
+                Combinator::S => abs!(
+                    x,
+                    abs!(
+                        y,
+                        abs!(z, app!(app!(var!(x), var!(z)), app!(var!(y), var!(z))))
+                    )
+                ),
+                Combinator::K => abs!(x, abs!(y, var!(x))),
+                Combinator::I => abs!(x, var!(x)),
+                Combinator::B => abs!(x, abs!(y, abs!(z, app!(var!(x), app!(var!(y), var!(z)))))),
+                Combinator::C => abs!(x, abs!(y, abs!(z, app!(app!(var!(x), var!(z)), var!(y))))),
+                Combinator::App(lhs, rhs) => app!((*lhs).into(), (*rhs).into()),
+            }
         }
     }
 }

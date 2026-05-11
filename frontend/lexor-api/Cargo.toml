@@ -7,6 +7,7 @@ description.workspace = true
 
 [dependencies]
 lexor-reducer = { workspace = true }
+lexor-convert = { workspace = true }
 serde = { version = "1.0.228", features = ["derive"] }
 serde_json = { version = "1.0" }
 thiserror = { workspace = true }

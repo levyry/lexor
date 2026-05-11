@@ -1,10 +1,13 @@
 use crate::{
-    graph::NodeData,
-    request::{WorkerRequest, WorkerRequestState},
-    response::{GraphStep, ReductionStep, WorkerResponse, WorkerResponseState},
-    visual::{RenderToken, VisualComb},
+    graph::{ApiGraphNodeKind, NodeData},
+    request::{ReductionRequest, ReductionRequestState},
+    response::{GraphStep, ReductionResponse, ReductionResponseState, ReductionStep},
+    visual::RenderToken,
 };
-use lexor_reducer::{EngineView, NF, ReductionStrat, core::node::NodeComb, eval};
+use lexor_reducer::{
+    EngineGraphNodeKind::{self},
+    EngineView, NF, ReductionStrat, evaluate_lambda,
+};
 
 pub mod graph;
 pub mod request;
@@ -14,29 +17,40 @@ pub mod strategy;
 pub mod visual;
 
 pub use lexor_reducer::LambdaReductionStrategy;
+use serde::{Deserialize, Serialize};
 pub use source_id::SourceID;
 pub use strategy::ApiStrategy;
 
-#[must_use]
-pub fn process_job(req_json: &str) -> String {
-    let req: WorkerRequest = serde_json::from_str(req_json).expect("Invalid JSON recieved");
+#[derive(Debug, Serialize, Deserialize, Clone, PartialEq, Eq, PartialOrd, Ord, Hash)]
+#[serde(tag = "type")]
+pub enum WorkerTask {
+    Reduction(ReductionRequest),
+    Conversion { source_id: SourceID, input: String },
+}
 
-    let response = if let WorkerRequestState::Ski {
+#[derive(Debug, Serialize, Deserialize, Clone, PartialEq, Eq, PartialOrd, Ord, Hash)]
+#[serde(tag = "type")]
+pub enum WorkerResult {
+    Reduction(ReductionResponse),
+    Conversion { source_id: SourceID, result: String },
+}
+
+#[must_use]
+pub fn reduce_expression(req: &ReductionRequest) -> ReductionResponse {
+    if let ReductionRequestState::Ski {
         wants_graph,
         wants_steps,
     } = req.state
     {
         if req.input.is_empty() {
-            let response = WorkerResponse {
+            return ReductionResponse {
                 source_id: req.source_id,
-                state: response::WorkerResponseState::Ski {
+                state: response::ReductionResponseState::Ski {
                     steps: wants_steps.then_some(vec![]),
                     graph_nodes: wants_graph.then_some(vec![]),
                 },
                 error: None,
             };
-
-            return serde_json::to_string(&response).expect("Response serialization error");
         }
 
         let mut steps: Vec<ReductionStep> = vec![];
@@ -58,17 +72,15 @@ pub fn process_job(req_json: &str) -> String {
             }
 
             if wants_graph {
-                // Fetch the backend graph
                 let engine_graph = view.extract_graph();
 
-                // Map it to the API graph
                 let api_graph: Vec<NodeData> = engine_graph
                     .into_iter()
                     .map(|node| {
                         let kind = match node.kind {
-                            lexor_reducer::EngineGraphNodeKind::App => graph::ApiGraphNodeKind::App,
-                            lexor_reducer::EngineGraphNodeKind::Comb(node_comb) => {
-                                graph::ApiGraphNodeKind::Comb(node_comb.into())
+                            EngineGraphNodeKind::App => ApiGraphNodeKind::App,
+                            EngineGraphNodeKind::Comb(node_comb) => {
+                                ApiGraphNodeKind::Comb(node_comb.into())
                             }
                         };
 
@@ -85,17 +97,17 @@ pub fn process_job(req_json: &str) -> String {
         });
 
         match result {
-            Ok(()) => WorkerResponse {
+            Ok(()) => ReductionResponse {
                 source_id: req.source_id,
-                state: WorkerResponseState::Ski {
+                state: ReductionResponseState::Ski {
                     steps: wants_steps.then_some(steps),
                     graph_nodes: wants_graph.then_some(graph),
                 },
                 error: None,
             },
-            Err(err) => WorkerResponse {
+            Err(err) => ReductionResponse {
                 source_id: req.source_id,
-                state: WorkerResponseState::Ski {
+                state: ReductionResponseState::Ski {
                     steps: None,
                     graph_nodes: None,
                 },
@@ -104,45 +116,34 @@ pub fn process_job(req_json: &str) -> String {
         }
     } else if let ApiStrategy::Lambda(strat) = req.strategy {
         if req.input.is_empty() {
-            let response = WorkerResponse {
+            return ReductionResponse {
                 source_id: req.source_id,
-                state: response::WorkerResponseState::Lambda {
+                state: response::ReductionResponseState::Lambda {
                     output: Some(String::new()),
                 },
                 error: None,
             };
-
-            return serde_json::to_string(&response).expect("Response serialization error");
         }
 
-        let result = eval(&req.input, strat);
+        let result = evaluate_lambda(&req.input, strat);
 
         match result {
-            Ok(str) => WorkerResponse {
+            Ok(str) => ReductionResponse {
                 source_id: req.source_id,
-                state: WorkerResponseState::Lambda { output: Some(str) },
+                state: ReductionResponseState::Lambda { output: Some(str) },
                 error: None,
             },
-            Err(err) => WorkerResponse {
+            Err(err) => ReductionResponse {
                 source_id: req.source_id,
-                state: WorkerResponseState::Lambda { output: None },
+                state: ReductionResponseState::Lambda { output: None },
                 error: Some(err.to_string()),
             },
         }
     } else {
         unreachable!("WorkerRequestState corrupted");
-    };
-
-    serde_json::to_string(&response).expect("Response serialization error")
+    }
 }
 
-// Helper function to cleanly map between boundaries
-const fn map_comb_to_visual(comb: NodeComb) -> VisualComb {
-    match comb {
-        NodeComb::S => VisualComb::S,
-        NodeComb::K => VisualComb::K,
-        NodeComb::I => VisualComb::I,
-        NodeComb::B => VisualComb::B,
-        NodeComb::C => VisualComb::C,
-    }
+pub fn convert_ski_to_lambda_string(input: &str) -> Result<String, String> {
+    lexor_convert::convert_ski_to_lambda(input)
 }

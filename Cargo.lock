@@ -1599,6 +1599,7 @@ dependencies = [
  "lexor-reducer",
  "serde",
  "serde_json",
+ "thiserror 2.0.18",
 ]
 
 [[package]]
@@ -1614,6 +1615,7 @@ name = "lexor-core"
 version = "0.1.0"
 dependencies = [
  "lower",
+ "serde",
  "thiserror 2.0.18",
 ]
 
@@ -1623,6 +1625,7 @@ version = "0.1.0"
 dependencies = [
  "chumsky",
  "lexor-core",
+ "serde",
  "thiserror 2.0.18",
 ]
 

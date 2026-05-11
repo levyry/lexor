@@ -1,16 +1,16 @@
-use lexor_api::{SourceID, WorkerResponse};
+use lexor_api::{SourceID, response::WorkerResponse, source_id::SourceKind, visual::VisualComb};
 use serde::{Deserialize, Serialize};
 
-use crate::source::SourceKind;
-
-
-#[derive(Clone, Debug, PartialEq, Eq, Hash, Serialize, Deserialize)]
+#[derive(Clone, Debug, PartialEq, Serialize, Deserialize)]
 pub enum AppMessage {
     RequestNewSource(SourceKind),
     RequestChainOutput(SourceID),
     RequestGraphOutput(SourceID),
-    SendReductionJob(SourceID),
+    SendSkiReductionJob(SourceID),
+    SendLambdaReductionJob(SourceID),
     SetGraphStep(SourceID, usize),
     WorkerJobCompleted(WorkerResponse),
     CloseSourceTab(SourceID),
+    AddLambdaInput(SourceID, VisualComb, f64),
+    ConvertSkiToLambda(SourceID),
 }

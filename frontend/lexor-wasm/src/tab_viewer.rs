@@ -1,8 +1,9 @@
-use egui::{Label, TopBottomPanel, Ui, WidgetText};
+use egui::{FontId, RichText, TopBottomPanel, Ui, WidgetText};
 use egui_dock::{TabViewer, tab_viewer::OnCloseResponse};
 use egui_graphs::{SettingsInteraction, SettingsNavigation};
 use lexor_api::{
-    SourceID,
+    LambdaReductionStrategy, SourceID,
+    source_id::SourceKind,
     visual::{RenderToken, TokenStyle, VisualComb},
 };
 use serde::{Deserialize, Serialize};
@@ -12,10 +13,21 @@ use crate::{messages::AppMessage, state::AppState};
 #[derive(Clone, Debug, PartialEq, Eq, Hash, Serialize, Deserialize)]
 pub enum AppTabs {
     Welcome,
-    SkiSource(SourceID),
-    LambdaSource(SourceID),
+    Source(SourceID),
     ReductionChain(SourceID),
     ReductionGraph(SourceID),
+}
+
+impl AppTabs {
+    #[must_use]
+    pub const fn get_id(&self) -> SourceID {
+        match self {
+            Self::Welcome => SourceID(usize::MAX),
+            Self::Source(source_id)
+            | Self::ReductionChain(source_id)
+            | Self::ReductionGraph(source_id) => *source_id,
+        }
+    }
 }
 
 pub struct LexorTabViewer<'a> {
@@ -28,8 +40,7 @@ impl TabViewer for LexorTabViewer<'_> {
     fn title(&mut self, tab: &mut Self::Tab) -> WidgetText {
         match tab {
             AppTabs::Welcome => "Welcome!".to_owned(),
-            AppTabs::SkiSource(id) => format!("SKI Source #{id}"),
-            AppTabs::LambdaSource(id) => format!("Lambda Source #{id}"),
+            AppTabs::Source(id) => format!("Source #{id}"),
             AppTabs::ReductionChain(id) => format!("Reduction Chain #{id}"),
             AppTabs::ReductionGraph(id) => format!("Reduction Graph #{id}"),
         }
@@ -39,15 +50,14 @@ impl TabViewer for LexorTabViewer<'_> {
     fn ui(&mut self, ui: &mut Ui, tab: &mut Self::Tab) {
         match *tab {
             AppTabs::Welcome => welcome_view(ui),
-            AppTabs::SkiSource(id) => self.ski_source_view(ui, id),
-            AppTabs::LambdaSource(_id) => todo!(),
+            AppTabs::Source(id) => self.source_view(ui, id),
             AppTabs::ReductionChain(id) => self.reduction_chain_view(ui, id),
             AppTabs::ReductionGraph(id) => self.reduction_graph_view(ui, id),
         }
     }
 
     fn on_close(&mut self, tab: &mut Self::Tab) -> OnCloseResponse {
-        if let AppTabs::SkiSource(id) = tab {
+        if let AppTabs::Source(id) = tab {
             self.state.push_msg(AppMessage::CloseSourceTab(*id));
         }
         OnCloseResponse::Close
@@ -60,7 +70,7 @@ fn welcome_view(ui: &mut Ui) {
 }
 
 impl LexorTabViewer<'_> {
-    fn ski_source_view(&mut self, ui: &mut Ui, id: SourceID) {
+    fn source_view(&mut self, ui: &mut Ui, id: SourceID) {
         ui.vertical(|ui| {
             let panel_id = egui::Id::new("source_top_panel").with(id);
 
@@ -70,47 +80,199 @@ impl LexorTabViewer<'_> {
                         let font_size = self.state.settings.source_font_sizes.get_mut(&id).unwrap();
                         ui.add(egui::Slider::new(font_size, 8.0..=30.0).integer());
                     });
-                    ui.menu_button("Add new...", |ui| {
-                        if ui.button("Reduction Chain").clicked() {
-                            self.state.push_msg(AppMessage::RequestChainOutput(id));
-                            ui.close_kind(egui::UiKind::Menu);
+
+                    let Some(source) = self.state.sources.get(&id) else {
+                        return;
+                    };
+
+                    if source.kind == SourceKind::Ski {
+                        ui.menu_button("Add new...", |ui| {
+                            if ui.button("Reduction Chain").clicked() {
+                                self.state.push_msg(AppMessage::RequestChainOutput(id));
+                                ui.close_kind(egui::UiKind::Menu);
+                            }
+                            if ui.button("Reduction Graph").clicked() {
+                                self.state.push_msg(AppMessage::RequestGraphOutput(id));
+                                ui.close_kind(egui::UiKind::Menu);
+                            }
+                        });
+                    }
+
+                    ui.with_layout(egui::Layout::right_to_left(egui::Align::Center), |ui| {
+                        let Some(source) = self.state.sources.get_mut(&id) else {
+                            return;
+                        };
+
+                        let lang_response = egui::ComboBox::from_id_salt(id)
+                            .selected_text(match source.kind {
+                                SourceKind::Ski => "SKI-kalkulus",
+                                SourceKind::Lambda => "λ-kalkulus",
+                            })
+                            .show_ui(ui, |ui| {
+                                ui.selectable_value(
+                                    &mut source.kind,
+                                    SourceKind::Ski,
+                                    "SKI-kalkulus",
+                                );
+                                ui.selectable_value(
+                                    &mut source.kind,
+                                    SourceKind::Lambda,
+                                    "λ-kalkulus",
+                                );
+                            })
+                            .response;
+
+                        let mut strategy_changed = false;
+
+                        if source.kind == SourceKind::Lambda {
+                            egui::ComboBox::from_id_salt(egui::Id::new("strategy_combo").with(id))
+                                .selected_text(source.lambda_strategy.to_string())
+                                .show_ui(ui, |ui| {
+                                    strategy_changed |= ui
+                                        .selectable_value(
+                                            &mut source.lambda_strategy,
+                                            LambdaReductionStrategy::CallByName,
+                                            "Call by name",
+                                        )
+                                        .changed();
+
+                                    strategy_changed |= ui
+                                        .selectable_value(
+                                            &mut source.lambda_strategy,
+                                            LambdaReductionStrategy::CallByValue,
+                                            "Call by value",
+                                        )
+                                        .changed();
+
+                                    strategy_changed |= ui
+                                        .selectable_value(
+                                            &mut source.lambda_strategy,
+                                            LambdaReductionStrategy::NormalOrder,
+                                            "Normal order",
+                                        )
+                                        .changed();
+                                });
+                        } else {
+                            egui::ComboBox::from_id_salt(egui::Id::new("strategy_combo").with(id))
+                                .selected_text("bomboclat")
+                                .show_ui(ui, |ui| {
+                                    strategy_changed |= ui
+                                        .selectable_value(
+                                            &mut source.ski_strategy,
+                                            (),
+                                            "Unimplemented",
+                                        )
+                                        .changed();
+                                });
                         }
-                        if ui.button("Reduction Graph").clicked() {
-                            self.state.push_msg(AppMessage::RequestGraphOutput(id));
-                            ui.close_kind(egui::UiKind::Menu);
+
+                        let new_kind = source.kind;
+
+                        if strategy_changed || lang_response.changed() {
+                            self.state.push_msg(match new_kind {
+                                SourceKind::Ski => AppMessage::SendSkiReductionJob(id),
+                                SourceKind::Lambda => AppMessage::SendLambdaReductionJob(id),
+                            });
                         }
                     });
                 });
             });
 
-            ui.vertical_centered(|ui| {
-                ui.label("You can toggle which combinators you want to use here.");
-                for comb in [
-                    (VisualComb::S, "a -> b -> c -> a c(b c)"),
-                    (VisualComb::K, "a -> b -> a"),
-                    (VisualComb::I, "a -> a"),
-                    (VisualComb::B, "a -> b -> c -> a(b c)"),
-                    (VisualComb::C, "a -> b -> c -> a c b"),
-                ] {
-                    ui.add(Label::new(format!("{}:\t{}", comb.0, comb.1)).halign(egui::Align::Min));
-                }
-            });
+            let Some(source) = self.state.sources.get(&id) else {
+                return;
+            };
+
+            if source.kind == SourceKind::Ski {
+                egui::Frame::new()
+                    .inner_margin(egui::Margin::same(12))
+                    .show(ui, |ui|{
+                        ui.vertical(|ui| {
+                            ui.heading("SKI calculus");
+                            ui.label("Try converting the contents of the input field to lambda calculus!");
+                            ui.add_space(4.0);
+                            ui.horizontal(|ui| {
+                                if ui.button("Convert").clicked() {
+                                    self.state.push_msg(AppMessage::ConvertSkiToLambda(id));
+                                }
+
+                                
+                                // We need the &str so that the textedit
+                                // is immutable by default, but still selectable
+                                let display_text = source.converted_lambda_output.as_deref().unwrap_or("");
+                                
+                                let mut read_only_ref = display_text;
+
+                                ui.add(
+                                    egui::TextEdit::singleline(&mut read_only_ref)
+                                        .hint_text("Converted output will appear here...")
+                                        .desired_width(f32::INFINITY)
+                                );
+                            });
+                        });
+                    });
+            } else {
+                egui::Frame::new()
+                    .inner_margin(egui::Margin::same(12))
+                    .show(ui, |ui|{
+                        ui.vertical(|ui| {
+                            ui.heading("Lambda calculus");
+                            ui.label("You can use these buttons to add the lambda definitions of combinators to your input field.");
+
+                            ui.add_space(4.0);
+
+                            egui::Grid::new(egui::Id::new("lambda_buttons_grid").with(id))
+                            .num_columns(2)
+                            .spacing([0.0, 6.0])
+                            .show(ui, |ui| {
+                                let button_size = egui::vec2(30.0, 24.0);
+                                
+                                for (comb, def) in [
+                                    (VisualComb::S, "a -> b -> c -> a c(b c)"),
+                                    (VisualComb::K, "a -> b -> a"),
+                                    (VisualComb::I, "a -> a"),
+                                    (VisualComb::B, "a -> b -> c -> a(b c)"),
+                                    (VisualComb::C, "a -> b -> c -> a c b"),
+                                    ] {
+                                        let button = egui::Button::new(comb.to_string());
+                                        
+                                        if ui.add_sized(button_size, button).clicked() {
+                                            self.state.push_msg(AppMessage::AddLambdaInput(id, comb, ui.input(|i| i.time)));
+                                        }
+                                        ui.label(def);
+                                        ui.end_row();
+                                    }
+                                });
+                            }); 
+                    });
+            }
+
+            let Some(source) = self.state.sources.get_mut(&id) else {
+                return;
+            };
 
             TopBottomPanel::bottom(egui::Id::new("source_bottom_panel").with(id)).show_inside(
                 ui,
                 |ui| {
-                    let Some(source) = self.state.sources.get_mut(&id) else {
-                        log::debug!("returning");
-                        return;
-                    };
-
-                    let input_response = egui::TextEdit::singleline(&mut source.contents)
-                        .font(egui::FontId::proportional(
+                    if let Some(error) = &source.error {
+                        ui.label(format!("Error: {error}"));
+                    } else if SourceKind::Lambda == source.kind
+                        && let Some(output) = &source.lambda_output
+                    {
+                        ui.label(RichText::new(output).font(FontId::proportional(
                             *self.state.settings.source_font_sizes.get(&id).unwrap(),
-                        ))
-                        .desired_width(f32::INFINITY)
-                        .show(ui)
-                        .response;
+                        )));
+                    }
+
+                    let input_response = egui::TextEdit::singleline(match source.kind {
+                        SourceKind::Ski => &mut source.ski_input,
+                        SourceKind::Lambda => &mut source.lambda_input,
+                    })
+                    .font(egui::FontId::proportional(
+                        *self.state.settings.source_font_sizes.get(&id).unwrap(),
+                    ))
+                    .desired_width(f32::INFINITY)
+                    .show(ui)
+                    .response;
 
                     if input_response.changed() {
                         source.last_edited_time = ui.input(|i| i.time);
@@ -178,7 +340,7 @@ impl LexorTabViewer<'_> {
             .state
             .sources
             .get(&source_id)
-            .map_or(0, |source| source.active_graph_step);
+            .map_or(0, |src| src.active_graph_step);
 
         self.graph_controls_view(ui, source_id, current_step);
         self.graph_view(ui, source_id, current_step);
@@ -225,10 +387,7 @@ impl LexorTabViewer<'_> {
             // TODO: Find a way to not have to reset layout every frame
             egui_graphs::reset_layout::<egui_graphs::LayoutStateHierarchical>(ui, id);
             ui.ctx().request_repaint();
-        } else {
-            let Some(source) = self.state.sources.get(&source_id) else {
-                return;
-            };
+        } else if let Some(source) = self.state.sources.get(&source_id) {
             ui.centered_and_justified(|ui| {
                 if source.compiled_graphs.contains_key(&current_step) {
                     self.state
@@ -242,10 +401,8 @@ impl LexorTabViewer<'_> {
     }
 
     fn graph_controls_view(&self, ui: &mut Ui, source_id: SourceID, mut current_step: usize) {
-        let Some(source) = self.state.sources.get(&source_id) else {
-            return;
-        };
-        if let Some(graphs) = &source.reduction_graph
+        if let Some(source) = self.state.sources.get(&source_id)
+            && let Some(graphs) = &source.reduction_graph
             && !source.compiled_graphs.is_empty()
         {
             let max_step = graphs.len().saturating_sub(1);

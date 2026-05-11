@@ -20,6 +20,8 @@ pub mod lambda {
 
     use core::fmt;
 
+    use crate::de_bruijn::DeBruijn;
+
     /// Represents an untyped lambda calculus term (not using De Bruijn indexing).
     #[derive(Clone, Debug, PartialEq, Eq)]
     pub enum Lambda {
@@ -39,6 +41,61 @@ pub mod lambda {
                 Self::App(lhs, rhs) if let Self::App(_, _) = **rhs => write!(f, "({lhs})({rhs})"),
                 Self::App(lhs, rhs) => write!(f, "({lhs}){rhs}"),
             }
+        }
+    }
+
+    impl TryFrom<DeBruijn> for Lambda {
+        type Error = String;
+
+        fn try_from(value: DeBruijn) -> Result<Self, Self::Error> {
+            fn convert(
+                db: DeBruijn,
+                scope: &mut Vec<String>,
+                counter: usize,
+                alphabet: &mut std::iter::Chain<
+                    std::ops::RangeInclusive<char>,
+                    std::ops::RangeInclusive<char>,
+                >,
+            ) -> Result<Lambda, String> {
+                match db {
+                    DeBruijn::BVar(index) => {
+                        let name = scope
+                            .iter()
+                            .rev()
+                            .nth(index)
+                            .ok_or_else(|| "De Bruijn index out of bounds".to_owned())?
+                            .clone();
+
+                        Ok(Lambda::Var(name))
+                    }
+
+                    DeBruijn::FVar(name) => Ok(Lambda::Var(name)),
+
+                    DeBruijn::Abs(body) => {
+                        let name = alphabet.next().ok_or("Ran out of names")?;
+                        let new_counter = counter.saturating_add(1);
+
+                        scope.push(name.to_string());
+
+                        let body_lambda_expr = convert(*body, scope, new_counter, alphabet)?;
+
+                        scope.pop();
+
+                        Ok(Lambda::Abs(name.to_string(), Box::new(body_lambda_expr)))
+                    }
+                    DeBruijn::App(lhs, rhs) => Ok(Lambda::App(
+                        Box::new(convert(*lhs, scope, counter, alphabet)?),
+                        Box::new(convert(*rhs, scope, counter, alphabet)?),
+                    )),
+                }
+            }
+
+            convert(
+                value,
+                &mut Vec::<String>::new(),
+                0,
+                &mut ('a'..='z').chain('A'..='Z'),
+            )
         }
     }
 }

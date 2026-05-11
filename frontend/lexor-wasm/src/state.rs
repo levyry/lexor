@@ -1,15 +1,10 @@
 use std::{cell::RefCell, collections::HashMap, rc::Rc};
 
 use egui_dock::Style;
-use lexor_api::SourceID;
+use lexor_api::{SourceID, source_id::SourceKind};
 use serde::{Deserialize, Serialize};
 
-use crate::{
-    messages::AppMessage,
-    settings::Settings,
-    source::{Source, SourceKind},
-    tab_viewer::AppTabs,
-};
+use crate::{messages::AppMessage, settings::Settings, source::Source, tab_viewer::AppTabs};
 
 #[derive(Default, Serialize, Deserialize)]
 pub struct AppState {
@@ -33,14 +28,11 @@ impl AppState {
 
         let id = SourceID(id);
 
-        self.sources.insert(id, Source::new(SourceKind::Ski));
+        self.sources.insert(id, Source::new(kind));
 
         self.settings.source_font_sizes.insert(id, 12.0);
 
-        match kind {
-            SourceKind::Ski => AppTabs::SkiSource(id),
-            SourceKind::Lambda => AppTabs::LambdaSource(id),
-        }
+        AppTabs::Source(id)
     }
 
     pub fn push_msg(&self, msg: AppMessage) {

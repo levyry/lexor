@@ -5,14 +5,19 @@ use std::{cell::RefCell, collections::HashMap, rc::Rc, vec};
 use crate::{
     graph::build_egui_graph,
     messages::AppMessage,
-    source::SourceKind,
     state::AppState,
     tab_viewer::{AppTabs, LexorTabViewer},
     worker_bridge::WorkerBridge,
 };
 use egui::{CentralPanel, Frame, TopBottomPanel, Ui};
 use egui_dock::{DockArea, DockState, NodeIndex, Style};
-use lexor_api::{SourceID, WorkerRequest};
+use lexor_api::{
+    ApiStrategy, SourceID,
+    request::{WorkerRequest, WorkerRequestState},
+    response::WorkerResponseState,
+    source_id::SourceKind,
+    visual::VisualComb,
+};
 use serde::{Deserialize, Serialize};
 
 #[derive(Serialize, Deserialize)]
@@ -28,9 +33,7 @@ impl Default for LexorApp {
     fn default() -> Self {
         let mut state = AppState::default();
         let ski_tab = state.new_source(SourceKind::Ski);
-        let AppTabs::SkiSource(id) = ski_tab else {
-            unreachable!()
-        };
+        let id = ski_tab.get_id();
         let reduction_tab = AppTabs::ReductionChain(id);
 
         let mut tree = DockState::new(vec![AppTabs::Welcome]);
@@ -139,7 +142,8 @@ impl LexorApp {
                 // Send a reduction job so that if the user opened this panel
                 // after already having typed in the input, it populates
                 // automatically.
-                self.state.push_msg(AppMessage::SendReductionJob(source_id));
+                self.state
+                    .push_msg(AppMessage::SendSkiReductionJob(source_id));
             }
             AppMessage::RequestGraphOutput(source_id) => {
                 self.spawn_tab(AppTabs::ReductionGraph(source_id));
@@ -147,7 +151,8 @@ impl LexorApp {
                 // Send a reduction job so that if the user opened this panel
                 // after already having typed in the input, it populates
                 // automatically.
-                self.state.push_msg(AppMessage::SendReductionJob(source_id));
+                self.state
+                    .push_msg(AppMessage::SendSkiReductionJob(source_id));
             }
             AppMessage::SetGraphStep(source_id, step_idx) => {
                 let Some(source) = self.state.sources.get_mut(&source_id) else {
@@ -155,14 +160,13 @@ impl LexorApp {
                 };
 
                 let is_active = source.is_at_step(step_idx);
-
                 let is_compiled = source.is_cached_for(step_idx);
 
                 if is_active && is_compiled {
                     return;
                 }
 
-                source.active_graph_step = step_idx;
+                source.set_graph_step(step_idx);
 
                 if let Some(graph_history) = &source.reduction_graph
                     && let Some(step_data) = graph_history.get(step_idx)
@@ -173,7 +177,7 @@ impl LexorApp {
                         .or_insert_with(|| crate::graph::build_egui_graph(step_data));
                 }
             }
-            AppMessage::SendReductionJob(source_id) => {
+            AppMessage::SendSkiReductionJob(source_id) => {
                 let wants_steps = self.is_steps_open_for(source_id);
                 let wants_graph = self.is_graph_open_for(source_id);
 
@@ -186,12 +190,33 @@ impl LexorApp {
 
                 let request = WorkerRequest {
                     source_id,
-                    code: source.contents.clone(),
-                    wants_steps,
-                    wants_graph,
+                    strategy: ApiStrategy::Ski(()),
+                    state: WorkerRequestState::Ski {
+                        wants_steps,
+                        wants_graph,
+                    },
+                    input: source.ski_input.clone(),
                 };
 
-                if let Some(bridge) = self.worker.as_ref() {
+                if let Some(bridge) = &self.worker {
+                    bridge.send_job(&request);
+                }
+            }
+            AppMessage::SendLambdaReductionJob(source_id) => {
+                let Some(source) = self.state.sources.get_mut(&source_id) else {
+                    return;
+                };
+
+                source.lambda_output = None;
+
+                let request = WorkerRequest {
+                    source_id,
+                    strategy: ApiStrategy::Lambda(source.lambda_strategy),
+                    state: WorkerRequestState::Lambda { placeholder: false },
+                    input: source.lambda_input.clone(),
+                };
+
+                if let Some(bridge) = &self.worker {
                     bridge.send_job(&request);
                 }
             }
@@ -209,18 +234,51 @@ impl LexorApp {
                     return;
                 };
 
-                source.active_graph_step = 0;
-                source.reduction_chain = worker_response.steps;
-                source.reduction_graph = worker_response.graph_nodes;
-                source.compiled_graphs = HashMap::new();
-
-                // Precompile the first step
-                if let Some(graphs) = &source.reduction_graph
-                    && let Some(first_step) = graphs.first()
-                {
-                    let egui_graph = build_egui_graph(first_step);
-                    source.compiled_graphs.insert(0, egui_graph);
+                if let Some(error) = worker_response.error {
+                    source.set_error(error);
+                    return;
                 }
+
+                source.remove_error();
+
+                if let WorkerResponseState::Ski { steps, graph_nodes } = worker_response.state {
+                    source.reduction_chain = steps;
+                    source.reduction_graph = graph_nodes;
+                    source.active_graph_step = 0;
+                    source.compiled_graphs = HashMap::new();
+
+                    if let Some(graphs) = &source.reduction_graph
+                        && let Some(first_step) = graphs.first()
+                    {
+                        let egui_graph = build_egui_graph(first_step);
+                        source.compiled_graphs.insert(0, egui_graph);
+                    }
+                } else if let WorkerResponseState::Lambda { output } = worker_response.state {
+                    source.lambda_output = output;
+                }
+            }
+            AppMessage::AddLambdaInput(source_id, visual_comb, time) => {
+                let Some(source) = self.state.sources.get_mut(&source_id) else {
+                    return;
+                };
+
+                let conversion = match visual_comb {
+                    VisualComb::S => "(\\x.\\y.\\z.x z(y z))",
+                    VisualComb::K => "(\\x.\\y.x)",
+                    VisualComb::I => "(\\x.x)",
+                    VisualComb::B => "(\\x.\\y.\\z.x(y z))",
+                    VisualComb::C => "(\\x.\\y.\\z.x z y)",
+                };
+
+                source.lambda_input.push_str(conversion);
+                source.last_edited_time = time;
+            }
+            AppMessage::ConvertSkiToLambda(source_id) => {
+                let Some(source) = self.state.sources.get_mut(&source_id) else {
+                    return;
+                };
+
+                source.converted_lambda_output = Some(String::from("(\\x.x)"));
             }
         }
     }
@@ -244,13 +302,16 @@ impl LexorApp {
 
         for (&id, source) in &mut self.state.sources {
             if current_time - source.last_edited_time > debounce_delay {
-                to_recompile.push(id);
+                to_recompile.push((id, source.kind));
                 source.last_edited_time = f64::INFINITY;
             }
         }
 
-        for id in to_recompile {
-            self.state.push_msg(AppMessage::SendReductionJob(id));
+        for (id, kind) in to_recompile {
+            self.state.push_msg(match kind {
+                SourceKind::Ski => AppMessage::SendSkiReductionJob(id),
+                SourceKind::Lambda => AppMessage::SendLambdaReductionJob(id),
+            });
         }
     }
 

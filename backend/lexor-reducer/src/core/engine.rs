@@ -1,6 +1,7 @@
 use arrayvec::ArrayVec;
 use lexor_core::combinator::Combinator;
 use lower::saturating::math as saturating;
+use serde::{Deserialize, Serialize};
 use thiserror::Error;
 
 use crate::core::{
@@ -10,7 +11,7 @@ use crate::core::{
 
 const PRESIZE: usize = 10_000;
 
-#[derive(Error, Debug, PartialEq, Eq)]
+#[derive(Error, Debug, PartialEq, PartialOrd, Ord, Eq, Hash, Clone, Deserialize, Serialize)]
 pub enum EngineError {
     #[error("tried reducing on an empty spine")]
     EmptySpine,

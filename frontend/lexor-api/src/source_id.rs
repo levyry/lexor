@@ -37,3 +37,9 @@ impl fmt::Display for SourceID {
         write!(f, "{}", self.0)
     }
 }
+
+#[derive(Debug, Copy, Clone, PartialEq, Eq, PartialOrd, Ord, Hash, Serialize, Deserialize)]
+pub enum SourceKind {
+    Ski,
+    Lambda,
+}

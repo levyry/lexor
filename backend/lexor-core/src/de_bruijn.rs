@@ -5,23 +5,35 @@ This module provides a definition for a Lambda calculus term in the
 TODO: Finish docs, add example
 */
 
+use core::fmt;
 use std::vec;
 
 use lower::saturating::math as saturating;
+use serde::{Deserialize, Serialize};
 
 use crate::lambda::Lambda;
 
 /// Reduction strategies. TODO: Write this doc.
 // TODO: Refactor this to work similarly to how we handle
 //       combinator reduction kinds (trait based)
-#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
-pub enum ReductionStrategy {
+#[derive(Debug, Clone, Copy, PartialEq, Eq, PartialOrd, Ord, Hash, Serialize, Deserialize)]
+pub enum LambdaReductionStrategy {
     /// Call by name
     CallByName,
     /// Call by value
     CallByValue,
     /// Normal order
     NormalOrder,
+}
+
+impl fmt::Display for LambdaReductionStrategy {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        f.write_str(match self {
+            Self::CallByName => "Call by name",
+            Self::CallByValue => "Call by value",
+            Self::NormalOrder => "Normal order",
+        })
+    }
 }
 
 /// Locally nameless De Bruijn representation.
@@ -148,47 +160,43 @@ impl DeBruijn {
 
     #[must_use]
     /// Evaluate the expression with a [`ReductionStrategy`].
-    pub fn evaluate(self, strat: ReductionStrategy) -> Self {
+    pub fn evaluate(self, strat: LambdaReductionStrategy) -> Self {
         match strat {
-            ReductionStrategy::CallByName => match self {
-                Self::App(lhs, rhs) => {
-                    let lhs_eval = lhs.evaluate(strat);
+            LambdaReductionStrategy::CallByName if let Self::App(lhs, rhs) = self => {
+                let lhs_eval = lhs.evaluate(strat);
 
-                    if let Self::Abs(body) = lhs_eval {
-                        body.beta_reduce(0, *rhs).evaluate(strat)
-                    } else {
-                        Self::App(Box::new(lhs_eval), rhs)
-                    }
+                if let Self::Abs(body) = lhs_eval {
+                    body.beta_reduce(0, *rhs).evaluate(strat)
+                } else {
+                    Self::App(Box::new(lhs_eval), rhs)
                 }
-                _ => self,
-            },
-            ReductionStrategy::CallByValue => match self {
-                Self::App(lhs, rhs) => {
-                    let lhs_eval = lhs.evaluate(strat);
-                    let rhs_eval = rhs.evaluate(strat);
+            }
+            LambdaReductionStrategy::CallByValue if let Self::App(lhs, rhs) = self => {
+                let lhs_eval = lhs.evaluate(strat);
+                let rhs_eval = rhs.evaluate(strat);
 
-                    if let Self::Abs(body) = lhs_eval {
-                        body.beta_reduce(0, rhs_eval).evaluate(strat)
-                    } else {
-                        Self::App(Box::new(lhs_eval), Box::new(rhs_eval))
-                    }
+                if let Self::Abs(body) = lhs_eval {
+                    body.beta_reduce(0, rhs_eval).evaluate(strat)
+                } else {
+                    Self::App(Box::new(lhs_eval), Box::new(rhs_eval))
                 }
-                _ => self,
-            },
-            ReductionStrategy::NormalOrder => match self {
-                Self::Abs(body) => Self::Abs(Box::new(body.evaluate(strat))),
+            }
+            LambdaReductionStrategy::NormalOrder if let Self::Abs(body) = self => {
+                Self::Abs(Box::new(body.evaluate(strat)))
+            }
 
-                Self::App(lhs, rhs) => {
-                    let lhs_whnf = lhs.clone().evaluate(ReductionStrategy::CallByName);
+            LambdaReductionStrategy::NormalOrder if let Self::App(lhs, rhs) = self => {
+                let lhs_whnf = lhs.clone().evaluate(LambdaReductionStrategy::CallByName);
 
-                    if let Self::Abs(body) = lhs_whnf {
-                        body.beta_reduce(0, *rhs).evaluate(strat)
-                    } else {
-                        Self::App(Box::new(lhs.evaluate(strat)), Box::new(rhs.evaluate(strat)))
-                    }
+                if let Self::Abs(body) = lhs_whnf {
+                    body.beta_reduce(0, *rhs).evaluate(strat)
+                } else {
+                    Self::App(Box::new(lhs.evaluate(strat)), Box::new(rhs.evaluate(strat)))
                 }
-                _ => self,
-            },
+            }
+            LambdaReductionStrategy::CallByName
+            | LambdaReductionStrategy::CallByValue
+            | LambdaReductionStrategy::NormalOrder => self,
         }
     }
 }

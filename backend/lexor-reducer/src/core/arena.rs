@@ -1,9 +1,10 @@
 use crate::core::node::{Node, NodeComb, NodeKey};
 use lexor_core::combinator::Combinator;
+use serde::{Deserialize, Serialize};
 use slotmap::SlotMap;
 use thiserror::Error;
 
-#[derive(Error, Debug, PartialEq, Eq)]
+#[derive(Error, Debug, PartialEq, PartialOrd, Ord, Eq, Hash, Clone, Deserialize, Serialize)]
 pub enum ArenaError {
     #[error("referenced key not in arena")]
     MissingKey,

@@ -8,10 +8,11 @@ pub mod ski_parser {
     */
     use chumsky::prelude::*;
     use lexor_core::combinator::Combinator;
+    use serde::{Deserialize, Serialize};
     use thiserror::Error;
 
     /// Parsing error
-    #[derive(Error, Debug, PartialEq, Eq)]
+    #[derive(Error, Debug, PartialEq, PartialOrd, Eq, Ord, Hash, Clone, Deserialize, Serialize)]
     pub enum ParsingError {
         /// Chumsky
         #[error("Chumsky parsing error...")]

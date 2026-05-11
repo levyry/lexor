@@ -1,6 +1,7 @@
 use core::{fmt::Debug, hash::Hash};
 
 use lexor_parser::ski_parser::{ParsingError::ChumskyError, chumsky_parse as parse};
+use serde::{Deserialize, Serialize};
 use thiserror::Error;
 
 use crate::{
@@ -11,7 +12,7 @@ use crate::{
     engineview::EngineView,
 };
 
-#[derive(Error, Debug, PartialEq, Eq)]
+#[derive(Error, Debug, PartialEq, PartialOrd, Ord, Eq, Hash, Clone, Deserialize, Serialize)]
 pub enum ReductionError {
     #[error("Arena error: {0}")]
     Arena(#[from] crate::core::arena::ArenaError),

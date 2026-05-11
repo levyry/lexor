@@ -1,6 +1,7 @@
 use std::{cell::RefCell, rc::Rc};
 
-use lexor_api::{WorkerRequest, WorkerResponse};
+use lexor_api::request::WorkerRequest;
+use lexor_api::response::WorkerResponse;
 use wasm_bindgen::{JsCast, prelude::Closure};
 
 use crate::messages::AppMessage;

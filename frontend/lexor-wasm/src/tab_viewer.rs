@@ -154,13 +154,20 @@ impl LexorTabViewer<'_> {
                                 });
                         } else {
                             egui::ComboBox::from_id_salt(egui::Id::new("strategy_combo").with(id))
-                                .selected_text("bomboclat")
+                                .selected_text(source.ski_strategy.to_string())
                                 .show_ui(ui, |ui| {
                                     strategy_changed |= ui
                                         .selectable_value(
                                             &mut source.ski_strategy,
-                                            (),
-                                            "Unimplemented",
+                                            lexor_api::SkiReductionStrat::WeakHeadNormalForm,
+                                            "Weak head normal form",
+                                        )
+                                        .changed();
+                                    strategy_changed |= ui
+                                        .selectable_value(
+                                            &mut source.ski_strategy,
+                                            lexor_api::SkiReductionStrat::NormalForm,
+                                            "Normal form",
                                         )
                                         .changed();
                                 });

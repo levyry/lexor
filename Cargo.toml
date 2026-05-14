@@ -51,6 +51,7 @@ panic = "deny"
 exit = "deny"
 as_conversions = "deny"
 missing_panics_doc = "allow" # TODO: remove this
+missing_errors_doc = "allow" # TODO: remove this
 ## Restrictions
 if_then_some_else_none = "deny"
 str_to_string = "deny"

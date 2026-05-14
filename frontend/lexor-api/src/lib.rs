@@ -6,7 +6,7 @@ use crate::{
 };
 use lexor_reducer::{
     EngineGraphNodeKind::{self},
-    EngineView, NF, ReductionStrat, evaluate_lambda,
+    EngineView, evaluate_lambda,
 };
 
 pub mod graph;
@@ -16,7 +16,7 @@ pub mod source_id;
 pub mod strategy;
 pub mod visual;
 
-pub use lexor_reducer::LambdaReductionStrategy;
+pub use lexor_reducer::{LambdaReductionStrategy, SkiReductionStrat};
 use serde::{Deserialize, Serialize};
 pub use source_id::SourceID;
 pub use strategy::ApiStrategy;
@@ -41,6 +41,7 @@ pub fn reduce_expression(req: &ReductionRequest) -> ReductionResponse {
         wants_graph,
         wants_steps,
     } = req.state
+        && let ApiStrategy::Ski(strat) = req.strategy
     {
         if req.input.is_empty() {
             return ReductionResponse {
@@ -56,7 +57,7 @@ pub fn reduce_expression(req: &ReductionRequest) -> ReductionResponse {
         let mut steps: Vec<ReductionStep> = vec![];
         let mut graph: Vec<GraphStep> = vec![];
 
-        let result = NF::compute_with(&req.input, |view: EngineView| {
+        let result = strat.compute_with(&req.input, |view: EngineView| {
             if wants_steps {
                 let mut step_tokens = vec![];
 

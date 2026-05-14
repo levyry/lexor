@@ -1,7 +1,7 @@
 use std::collections::HashMap;
 
 use lexor_api::{
-    LambdaReductionStrategy,
+    LambdaReductionStrategy, SkiReductionStrat,
     response::{GraphStep, ReductionStep},
     source_id::SourceKind,
 };
@@ -13,7 +13,7 @@ use crate::graph::LexorGraph;
 pub struct Source {
     pub kind: SourceKind,
     pub lambda_strategy: LambdaReductionStrategy,
-    pub ski_strategy: (),
+    pub ski_strategy: SkiReductionStrat,
     pub reduction_chain: Option<Vec<ReductionStep>>,
     pub reduction_graph: Option<Vec<GraphStep>>,
     pub active_graph_step: usize,
@@ -37,7 +37,7 @@ impl Source {
             error: None,
             ski_input: String::from("SKISKI"),
             lambda_input: String::from("\\x.\\y.\\z.y(x z)"),
-            ski_strategy: (),
+            ski_strategy: SkiReductionStrat::NormalForm,
             lambda_strategy: LambdaReductionStrategy::NormalOrder,
             reduction_chain: None,
             reduction_graph: None,

@@ -93,6 +93,14 @@
 \def\bibInSelf#1{In u\H{o}: }
 \csname bibOverride\endcsname
 
+\bibitem{chargueraudLocallyNamelessRepresentation2012b}
+Arthur Charguéraud:
+\bibNewBlock The {{Locally Nameless Representation}}.
+\bibNewBlock 49. \'evf. 3. sz., 363--408.~p.
+\bibNewBlock ISSN 1573-0670.
+\bibNewBlock
+\bibUrll{URL} >https://doi.org/10.1007/s10817-011-9225-2>.
+
 \bibitem{curryGrundlagenKombinatorischenLogik1930}
 H.~B. Curry:
 \bibNewBlock {Grundlagen der Kombinatorischen Logik}.

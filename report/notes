@@ -1,0 +1,15 @@
+- TPL + magyar lambda behivatkozás
+    - https://www.amazon.com/Types-Programming-Languages-MIT-Press/dp/0262162091 (ezt sok helyre lehet írni)
+    - https://www.typotex.hu/book/346/csornyei_zoltan_lambda_kalkulus
+- vizuális redex lánc bekezdés lecserélése
+- listing magyarosítása
+- repo + build instructions a végére (összefoglaló elé rögtön)
+- csatlakozó doksik kivétele
+- tesztelés <- nem kell orákulum a címbe, amúgy hivatkozás
+- honlap hivatkozások elérési dátummal
+
+---
+
+C++
+
+- néhány madárral nem működött, ezt ki kéne javítaniu

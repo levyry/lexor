@@ -193,13 +193,13 @@
 \subsection{Bevezető}
 \label{sec:bevezeto}
 
-Az elmúlt három évtizedben egyre nagyobb jelentőségre tesz szert a funkcionális programozás az iteratív és objektumorientált paradigmákkal szemben. Az figyelhető meg, hogy azok a programozási nyelvek, amelyek tradicionálisan objektumorientált szemléletűek voltak (például C++, Java), azokat napjainkra jelentős számú funkcionális elemmel bővítették (anonim függvények, lista komprehenzió, első osztályú függvények, etc.). Továbbá azok a nyelvek, amelyek az elmúlt évtizedben tettek szert népszerűségre (például Rust) már a kezdetektől fogva egy multiparadigmás nézettel lettek tervezve. Ezeket az új eszközöket viszont -- mind a már piacon lévő mérnökök továbbképzése, mind a felsőoktatásban résztvevők oktatása szempontjából -- pedagógiailag még a mai napig nehéz kielégítően oktatni. A funkcionális paradigma -- illetve annak a matematikai alapjai -- idegenek lehetnek a mérnöki beállítottságú közönség számára.
+Az elmúlt három évtizedben egyre nagyobb jelentőségre tett szert a funkcionális programozás az iteratív és objektumorientált paradigmákkal szemben. Az figyelhető meg, hogy azok a programozási nyelvek, amelyek tradicionálisan objektumorientált szemléletűek voltak (például C++, Java) napjainkra jelentős számú funkcionális elemmel bővültek (anonim függvények, lista komprehenzió, első osztályú függvények, stb.). Továbbá azok a nyelvek, amelyek az elmúlt évtizedben tettek szert népszerűségre (például Rust) már a kezdetektől fogva egy több paradigmát ötvöző nézettel lettek tervezve. Ezeket az új eszközöket viszont -- mind a már piacon lévő mérnökök továbbképzése, mind a felsőoktatásban résztvevők oktatása szempontjából -- pedagógiailag még a mai napig nehéz kielégítően oktatni. A funkcionális paradigma -- illetve annak a matematikai alapjai -- idegenek lehetnek a mérnöki beállítottságú közönség számára.
 
-A jelen írásos beszámolóban bemutatott szoftver ezt a pedagógiai hiányt próbálja pótolni: egy olyan vizuális, interaktív, webes eszközt ad a pedagógusok kezébe, amellyel a funkcionális programozást egészen a matematikai alapokig visszamenően lehet hatékonyabban oktatni, hozzá pontosabb intuíciót építeni.
+A jelen írásos beszámolómban bemutatott szoftver ezt a pedagógiai hiányt próbálja pótolni: egy olyan vizuális, interaktív, webes eszközt ad a pedagógusok kezébe, amellyel a funkcionális programozást egészen a matematikai alapokig visszamenően lehet hatékonyabban oktatni, hozzá pontosabb intuíciót építeni.
 
 A választott megközelítés (vizuális, webes program) nem egyedi. Számtalan más olyan témakörhöz, amelyek tradicionálisan pedagógiai kihívásokat jelentettek (generált gépi kód, vagy reguláris kifejezések elemzése) készült hasonló alapötletekkel rendelkező szoftver (mint például a \href{https://godbolt.org}{Compiler Explorer}, vagy \href{https://regex101.com}{Regex101}).
 
-A jelen beszámolóban bemutatott megközelítés a modern funkcionális nyelvek matematikai alapjait kívánja megcélozni (többek között redukciós láncok és gráfok, kiértékelési sorrendek, \lam- és \ski-kalkulus). Ezen alaptudás ismeretében a legtöbb modern funkcionális nyelv (ML-család, Lisp-család) értelmezőjének a működése -- legalábbis magas szinten -- könnyebben elsajátítható.
+A jelen beszámolómban bemutatott megközelítés a modern funkcionális nyelvek matematikai alapjait kívánja megcélozni (többek között redukciós láncok és gráfok, kiértékelési sorrendek, \lam- és \ski-kalkulus). Ezen alaptudás ismeretében a legtöbb modern funkcionális nyelv (ML-család, Lisp-család) szemantikáinak a működése -- legalábbis magas szinten -- könnyebben elsajátítható.
 
 \subsection{Elméleti összefoglaló}
 
@@ -227,54 +227,49 @@ A modern funkcionális programozási nyelvek alapjaikban a (típus nélküli) \l
 
 A \lam-absztrakció segítségével tudunk függvényeket definiálni, amelyeknek paramétereket az applikáció konstrukciójával tudunk adni. Ha kicsit módosítjuk a nyelvtanunkat, hogy szám konstansokat, és egyéb kényelmes konstrukciókat megengedjen, akkor írhatjuk például:
 
-$$
+\[
   \begin{aligned}
      & \lambda x.(5*x)      \\
      & (\lambda x.(5*x))(3) \\
      & 15
   \end{aligned}
-$$
+\]
 
-Az első sorban definiálunk egy függvény, amely ötszörözi a bemenetét. A második sorban meghívjuk ezt a függvényt a $3$ bemenettel. Az utolsó sorban az applikáció eredménye látható. Fontos megjegyezni, hogy az applikáció bal-asszociatív.
+Az első sorban definiálunk egy függvényt, amely ötszörözi a bemenetét. A második sorban meghívjuk ezt a függvényt a $3$ bemenettel. Az utolsó sorban a szorzás eredménye látható. Fontos megjegyezni, hogy az applikáció bal-asszociatív.
 
 \subsubsection{A \ski-kalkulus}
-A kombinátorok absztrakt matematikai konstrukciók, viszont megértésük és történelmi hátterük kritikus fontosságú a modern számítástudomány, különösen a funkcionális programozás, vagy a kiszámíthatóság modelljeinek vizsgálatakor.
+A kombinátorok absztrakt matematikai konstrukciók, viszont megértésük és történelmi hátterük kritikus fontosságú a modern számítástudomány, különösen a funkcionális programozás, vagy a kiszámíthatóság modelljeinek vizsgálatához.
 
-Általánosságban problémák formális, szimbolikus ábrázolását már az ókorban megkísérelték. Így született Arisztotelész logikája és Euklidész geometriája. A számítástudomány szempontjából viszont a 19. században a Boole-algebra megjelenése jelentette a legnagyobb áttörést. A 20. század fordulóján a matematikusok arra tettek kísérletet, hogy a teljes matematikát egy szigorú, tiszta logikai alapra helyezzék.
+Általánosságban különböző problémák formális, szimbolikus ábrázolását már az ókorban megkísérelték. Így született Arisztotelész logikája és Euklidész geometriája. A számítástudomány szempontjából viszont a 19. században a Boole-algebra megjelenése jelentette a legnagyobb áttörést. A 20. század fordulóján a matematikusok arra tettek kísérletet, hogy a teljes matematikát egy szigorú, tiszta logikai alapra helyezzék. Ahogy ezek a logikai keretrendszerek egyre nagyobbak lettek, megjelent az igény a bizonyos axiómák meghatározására. Ennek a törekvésnek a legismertebb példája a Sheffer-vonás felfedezése, amely bebizonyította, hogy a teljes ítéletkalkulus felépíthető egyetlen logikai kapu segítségével (NAND). Felmerült a kérdés: ha a logikai axiómák ilyen elemi szintre redukálhatóak, megtehető-e ugyanez általánosságban a függvényekkel és a változókkal is?
 
-Ahogy ezek a logikai keretrendszerek egyre nagyobbak lettek, megjelent az igény a bizonyos axiómák meghatározására. Ennek a törekvésnek a legismertebb példája a Sheffer-vonás felfedezése, amely bebizonyította, hogy a teljes ítéletkalkulus felépíthető egyetlen logikai kapu segítségével (NAND). Felmerült a kérdés: ha a logikai axiómák ilyen elemi szintre redukálhatóak, megtehető-e ugyanez általánosságban a függvényekkel és a változókkal is?
-
-1920-ban Moses Schönfinkel pontosan erre tett kísérletet \cite{schoenfinkelUeberBausteineMathematischen1924}. Felismerte, hogy ha a függvényeket kellőképpen általánosítjuk (egy függvény egy másik függvényt is kaphat paraméterként, és visszatérési értéke is lehet függvény), a változók feleslegessé válnak. Ezzel az elképzeléssel lefektette a kombinátorkalkulus  alapjait.
-
-A kombinátorkalkulus leghíresebb és leginkább letisztult formalizációja az \ski-kalkulus, amelyet Schönfinkel munkássága nyomán Haskell Curry dolgozott ki \cite{curryGrundlagenKombinatorischenLogik1930}. Ez pusztán három előre definiált kombinátor egymás utáni alkalmazásával is képes Turing-teljes számítások leírására.
+Moses Schönfinkel 1920-ban pontosan erre tett kísérletet \cite{schoenfinkelUeberBausteineMathematischen1924}. Felismerte, hogy ha a függvényeket kellőképpen általánosítjuk (egy függvény egy másik függvényt is kaphat paraméterként, és visszatérési értéke is lehet egy függvény), a változók feleslegessé válnak. Ezzel az elképzeléssel lefektette a kombinátorkalkulus  alapjait. A kombinátorkalkulus leghíresebb és leginkább letisztult\footnote{Bár a fent említett \ski rendszer az általánosan vizsgált forma, fontos megemlíteni, hogy léteznek kevesebb kombinátorokat igénybe vevő, Turing-teljes rendszerek is. Ilyen például az \Scomb és \Kcomb kombinátorokból álló bázis. Ez abból adódik, hogy az \Icomb kombinátor kifejezhető a másik kettőből, például \(\left(\Scomb\Kcomb\Kcomb\right)\) módon.} formalizációja az \ski-kalkulus, amelyet Schönfinkel munkássága nyomán Haskell Curry dolgozott ki \cite{curryGrundlagenKombinatorischenLogik1930}. Ez pusztán három előre definiált kombinátor egymás utáni alkalmazásával is képes Turing-teljes számítások leírására.
 
 A rendszer a következő három kombinátorból áll:
 \begin{itemize}
-  \item Az identitás kombinátor (\Icomb), amely beavatkozás nélkül, egyszerűen visszaadja a kapott argumentumát.
-  \item A konstans kombinátor (\Kcomb), amely olyan függvényt állít elő, ami a második argumentumát mindig figyelmen kívül hagyja, és visszaadja az elsőt.
-  \item A szubsztitúciós kombinátor (\Scomb), amely az argumentumok szétosztását és a függvényalkalmazás láncolatát végzi.
+  \item Az egyváltozós identitás kombinátor (\Icomb), amely beavatkozás nélkül, egyszerűen visszaadja a kapott argumentumát.
+  \item A kétváltozós konstans kombinátor (\Kcomb), amely olyan függvényt állít elő, ami a második argumentumát mindig figyelmen kívül hagyja, és visszaadja az elsőt.
+  \item A háromváltozós szubsztitúciós kombinátor (\Scomb), amely az argumentumok szétosztását és a függvényalkalmazás láncolatát végzi.
 \end{itemize}
 
 Bár a rendszert általában további kombinátorokkal is ki szokás egészíteni a kényelmesség és átláthatóság érdekében, ezek mind levezethetőek a fenti három kombinátorból.
 
 Ha a \lam-kalkulus, és a \ski-kalkulus és Turing-teljesek, akkor bizonyára kell lennie valamilyen ekvivalenciának közöttük. Alább megadom a \ski-kalkulus három kombinátorának a \lam-kalkulus szerinti definícióját:
 
-$$
+\[
   \begin{aligned}
     \Icomb & = \lambda x.x                              \\
     \Kcomb & = \lambda x.(\lambda y.x)                  \\
     \Scomb & = \lambda x.(\lambda y.(\lambda z.xz(yz)))
   \end{aligned}
-$$
+\]
 
 Ezeknek a szabályoknak az alkalmazásával tetszőleges \ski-kalkulus kifejezést át lehet alakítani \lam-kalkulus kifejezéssé, melyre a programban lehetőség is van.
 
 \subsection{A munka állapota, készültségi foka a félév elején}
 \label{sec:munka-allap-kesz}
 
-A jelen félév előtti szünetben már elkezdtem feldolgozni a témához releváns irodalmat. A 2025/26/I. félévben egy olyan tárgyat hallgattam, amelyen jelentős szerepe volt a \lam-kalkulusnak, kategória elméletnek. Ezek az előadások nagyban hozzájárultak az előzetes tudás megszerzéséhez. A konzulensem számos releváns könyvet ajánlott feldolgozásra, többek között \cite{smullyanMockMockingbirdOther2000, wolframCombinatorsCentennialView2020,wolframCombinatorsStoryComputation2020}.
+A jelen félév előtti szünetben már elkezdtem feldolgozni a témához releváns irodalmat. A 2025/26/I. félévben egy olyan tárgyat hallgattam, amelyben jelentős szerepe volt a \lam-kalkulusnak, kategória elméletnek. Ezek az előadások nagyban hozzájárultak az előzetes tudás megszerzéséhez. A konzulensem számos releváns könyvet ajánlott feldolgozásra, többek között Smullyan \cite{smullyanMockMockingbirdOther2000} és Wolfram \cite{wolframCombinatorsCentennialView2020, wolframCombinatorsStoryComputation2020} írásait.
 
-\newpage
 %==================================================================
 \section{Az elvégzett munka és az eredmények ismertetése}
 \label{sec:az-elvegzett-munka}
@@ -284,7 +279,7 @@ A jelen félév előtti szünetben már elkezdtem feldolgozni a témához relev�
 
 Az architektúra tervezésének folyamatában fordítóprogramokból merítettem inspirációt, különös tekintettel a moduláris felépítésre és az úgynevezett \emph{\foreignlanguage{english}{Separation of Concerns}} elvére.
 
-A nyelvtanok egyszerűsége miatt a lexert és a parsert egybevontam. A parserek megírásához a \href{https://codeberg.org/zesterer/chumsky}{chumsky} könyvtárat használtam, amely egy \emph{\foreignlanguage{english}{parser combinator}} alapú módszert használ, rekurzív leszállást igénybe véve. Két redukciós gépet implementáltam: egyet ami \lam-kalkuluson, egyet ami \ski-kalkuluson operál. A két parser és a hozzájuk tartozó redukciós gépekre egy egységként tekintettem, ezek alkották a backend könyvtárat.
+A nyelvtanok egyszerűsége miatt a lexert és a parsert egybevontam. A parserek megírásához a \href{https://codeberg.org/zesterer/chumsky}{chumsky} könyvtárat használtam, amely egy \foreignlanguage{english}{parser combinator} alapú módszert használ, rekurzív leszállást igénybe véve. Két redukciós gépet implementáltam: egyet ami \lam-kalkuluson, egyet ami \ski-kalkuluson operál. A két parser és a hozzájuk tartozó redukciós gépekre egy egységként tekintettem, ezek alkották a backend könyvtárat.
 
 A frontend és a backend közötti tiszta kommunikáció megteremtése érdekében a Homlokzat (\foreignlanguage{english}{Facade}) programtervezési mintát alkalmaztam. Ez az API réteg (\texttt{lexor-api}) elrejti a redukciós gépek komplexitását, és egy egységes interfészt biztosít a webes felület számára.
 
@@ -292,9 +287,9 @@ A frontend terén az úgynevezett \emph{Elm-architektúrát} követtem, amely eg
 \begin{itemize}
   \item A kezdeti \texttt{model}-re, amely az applikáció állapotát írja le. Ez az állapot nem mutábilis, tehát ahogy a felhasználó interakcióba lép vele, mindig egy teljesen új állapot jön létre.
   \item A \texttt{view} függvényre, amely a modell megjelenését írja le. A felhasználói interakciókat itt alakítom át üzenetekké.
-  \item Az \texttt{update} függvényre, amely az üzenetsort kiolvasva végrehajtja a felhasználó összes parancsát a modellen, egy új modellt létrehozva ezáltal.
+  \item Az \texttt{update} függvényre, amely az üzenetsort kiolvasva végrehajtja a felhasználó összes parancsát a jelenlegi modellen, ezáltal egy új modellt létrehozva.
 \end{itemize}
-Ahogy a felhasználó interakcióba lép a \texttt{UI}-al (\foreignlanguage{english}{User Interface}), úgy új üzenetek kerülnek az üzenetsorba. Az üzenetsort minden frame végén az \texttt{update} függvény kiüríti, és a tartalmát végrehajtja. Ezáltal egy új modell jön létre, amit átad a \texttt{view} függvénynek, ami egy új \texttt{UI}-t hoz létre. Az architektúra egyszerűsített vizuális modellje \aref{fig:tikz-arch}.~ábrán látható.
+Ahogy a felhasználó interakcióba lép a felhasználói felülettel, úgy új üzenetek kerülnek az üzenetsorba. Az üzenetsort minden frame végén az \texttt{update} függvény kiüríti, és a tartalmát végrehajtja. Ezáltal egy új modell jön létre, amit átad a \texttt{view} függvénynek, ami egy új \texttt{UI}-t hoz létre. Az architektúra egyszerűsített vizuális modellje \aref{fig:tikz-arch}.~ábrán látható.
 \begin{figure}[htbp]
   \centering
   \scalebox{0.75}{
@@ -355,14 +350,17 @@ Ahogy a felhasználó interakcióba lép a \texttt{UI}-al (\foreignlanguage{engl
   \label{fig:tikz-arch}
 \end{figure}
 
-Mind a frontend, mind a backend WebAssembly modulokra kerül fordításra, tehát az egész program a felhasználó böngészőjében tud futni kliensoldalon.
+Mind a frontend, mind a backend WebAssembly modulokra kerül fordításra, tehát az egész program a felhasználó böngészőjében tud futni kliensoldalon. Annak érdekében, hogy a CPU igényes backend számítások alatt a frontend ne fagyjon be, egy külön háttérszálon futnak a backend számításai, amelyhez Web Workereket használok.
 
 \subsection{A redukciós gépek implementálása}
 \label{sec:a-redukcios-gepek-impl}
 
-A redukciós gépek implementálásához a \foreignlanguage{english}{Graph Reduction Machine} (\foreignlanguage{english}{G-machine}) koncepcióját vizsgáltam meg. Optimalizálási célból a fa-alapú kiértékelés mellett az alkifejezések megosztása mellett döntöttem, amelyel exponenciálisan kevesebb lépésszámot vesznek igénybe az egyes redukciók \cite{LambdaNotFour}. Az elterjedtebb "sztringredukció" -- azaz amikor a bemenetet szövegmanipulációs módszerekkel alakítjuk át a redukciós szabályoknak megfelelően -- nem skálázódik elég jól hosszabb kifejezések kiértékelésére, illetve az előbb említett alkifejezés-megosztás technikáját sem tudom érvényesíteni.
+\subsubsection{A \ski-kalkulus}
+\label{sec:a-ski-kalkulus-impl}
 
-A követelmények elemzése és a belső reprezentáció kialakítása után implementáltam egy \foreignlanguage{english}{G-machine}-t mind a \lam-kalkulus, mind a \ski-kalkulus esetében. A \foreignlanguage{english}{G-machine}-eknél gyakran használt, fa alapú AST sokszor memóriatöredezettséghez és lassú futáshoz vezethet. Ennek elkerülése érdekében a \foreignlanguage{english}{Flat-AST} (laposított AST) reprezentációs technikát használtam, amelyet egy aréna memória-allokátorral (\foreignlanguage{english}{Arena allocator}) párosítottam \cite{FlatteningASTsOther}. Egy rekurzív, fa alapú megközelítés lehet \aref{lst:rec-node-ast}.~listingben bemutatott modell.
+A redukciós gépek implementálásához a \foreignlanguage{english}{Graph Reduction Machine} (\foreignlanguage{english}{G-machine}) koncepcióját vizsgáltam meg. Optimalizálási célból a fa-alapú kiértékelés mellett az alkifejezések megosztása mellett döntöttem, amellyel exponenciálisan kevesebb lépésszámot vesznek igénybe az egyes redukciók \cite{LambdaNotFour}. Az elterjedtebb "sztringredukció" -- azaz amikor a bemenetet szövegmanipulációs módszerekkel alakítjuk át a redukciós szabályoknak megfelelően -- nem skálázódik elég jól hosszabb kifejezések kiértékelésére, illetve az előbb említett alkifejezés-megosztás technikáját sem tudom érvényesíteni.
+
+A követelmények elemzése és a belső reprezentáció kialakítása után implementáltam egy \foreignlanguage{english}{G-machine}-t mind a \lam-kalkulus, mind a \ski-kalkulus esetében. Az ilyen redukciós gépek implementálása során gyakran használt, fa alapú AST (\foreignlanguage{english}{Abstract Syntax Tree}, absztrakt szintaxis fa) sokszor memóriatöredezettséghez és lassabb futáshoz vezethet. Ennek elkerülése érdekében a \foreignlanguage{english}{Flat-AST} (laposított AST) reprezentációs technikát használtam, amelyet egy aréna alapú memória-allokátorral párosítottam \cite{FlatteningASTsOther}. Egy rekurzív, fa alapú megközelítés lehet \aref{lst:rec-node-ast}.~listingben bemutatott modell.
 \begin{lstlisting}[float=htbp, caption={Egy rekurzív, mutató alapú gráf struktúra}, label={lst:rec-node-ast}]
 enum NodeRec {
     S, K, I,
@@ -370,7 +368,7 @@ enum NodeRec {
     Indirection(Box<Self>),
 }
 \end{lstlisting}
-Itt pointereket tárolunk el a többi csúcsra, amely csökkentheti a memória lokalitását, illetve az adatstruktúra méretét is növelheti $64$-bites rendszereken. Ehhez képest az aréna-allokátoros megközelítés -- melyet \aref{lst:arena-node-ast}.~listing mutat be -- nem használ mutatókat. Minden csúcsra az indexe alapján lehet hivatkozni, mely alapján az arénából kinyerhető.
+Itt pointereket tárolunk el a többi csúcsra, amely csökkentheti a memória lokalitását, illetve az adatstruktúra méretét is növelheti $64$-bites rendszereken. Ehhez képest az aréna-allokátoros megközelítés -- melyet \aref{lst:arena-node-ast}.~listing mutat be -- nem használ mutatókat. Minden csúcsra az indexe alapján lehet hivatkozni, mely alapján az arénából kinyerhető. Így a különböző kifejezések akár teljesen szomszédos memóriarégiókban lehetnek, növelve a cache-kihasználtságot.
 \begin{lstlisting}[float=htbp, caption={Egy aréna-allokátoros gráf struktúra}, label={lst:arena-node-ast}]
 enum NodeFlat {
     S, K, I,
@@ -379,27 +377,26 @@ enum NodeFlat {
 }
 \end{lstlisting}
 
-A G-machine a kombinátorok redukcióját egy állapotgép segítségével végzi. A kiértékelés során a veremben (spine) összegyűlt argumentumokat a gép a megfelelő kombinátor szabályai szerint helyettesíti be (például az \Scomb, \Kcomb, \Icomb kombinátorok esetében). A redukciós szabályok alkalmazását végrehajtó Rust kódrészlet a \ref{sec:csat-irod}.~szakaszban, a csatlakozó dokumentumok között tekinthető meg.
+A \foreignlanguage{english}{G-machine} a kombinátorok redukcióját egy állapotgép segítségével végzi. A kiértékelés során először végighaladunk a kifejezés "gerincén", amely azokból a csúcsokból áll, amit úgy kapunk, ha a fa gyökerétől kezdve addig megyünk balra, ameddig van baloldali gyerek. A gerincen összegyűlt csúcsok argumentumait a redukciós gép a megfelelő kombinátor szabályai szerint helyettesíti be (például az \Scomb, \Kcomb, \Icomb kombinátorok esetében). A redukciós szabályok alkalmazását végrehajtó Rust kódrészlet a \ref{sec:csat-irod}.~szakaszban, a csatlakozó dokumentumok között tekinthető meg.
 
-Mivel a szoftver célja az oktatás megkönnyítése, több redukciós stratégiát is támogatnom kellett (például \foreignlanguage{english}{Normal order}, \foreignlanguage{english}{Applicative order}, lusta kiértékelés). Ezek megértéséhez elemezzük \aref{fig:strategy}.~ábrát \cite{wolframCombinatorsCentennialView2020}, amely az alábbi kombinátor AST-ét ábrázolja:
+Mivel a szoftver célja az oktatás megkönnyítése, több redukciós stratégiát is támogatnom kellett (például \foreignlanguage{english}{Normal order}, \foreignlanguage{english}{Call-by-value}). Ezek megértéséhez elemezzük \aref{fig:strategy}.~ábrát \cite{wolframCombinatorsCentennialView2020}, amely az alábbi kombinátor AST-ét ábrázolja:
 
-$$
+\[
   \Scomb(\Scomb(\Scomb)(\Scomb)(\Scomb(\Scomb)(\Kcomb(\Kcomb)(\Scomb))(\Scomb)))(\Scomb)(\Scomb)(\Scomb(\Kcomb(\Scomb)(\Kcomb))(\Kcomb)(\Scomb))
-$$
+\]
 
 Az ábrán látható fában a szürke belső csomópontok az applikációkat (függvényalkalmazásokat) jelölik, a levelek pedig az egyes kombinátorokat. Látható, hogy egy ilyen komplex kifejezés esetén egyszerre több ponton is elvégezhető lenne a redukció. A támogatott stratégiák pontosan abban térnek el, hogy ezek közül melyiket választják:
 
 \begin{itemize}
-  \item Normál sorrend (\foreignlanguage{english}{Normal order} / \foreignlanguage{english}{Call-by-name}): Mindig a legbaloldalibb, legkülső (\foreignlanguage{english}{leftmost-outermost}) redexet választja ki. A gráfban ez a gyökértől balra haladva a legmagasabban fekvő kiemelt csomópont. Ez a stratégia garantálja, hogy ha egy kifejezésnek létezik normálformája (végeredménye), akkor azt el is éri a redukció végeztével. Ez \aref{fig:strategy}.~ábrán a $\Scomb(\Scomb(\Scomb)(\Scomb)(\Scomb(\Scomb)(\Kcomb(\Kcomb)(\Scomb))(\Scomb)))(\Scomb)(\Scomb)$ alkifejezésnek felel meg.
-  \item Applikatív sorrend (\foreignlanguage{english}{Applicative order} / \foreignlanguage{english}{Call-by-value}): A legbaloldalibb, legbelső (\foreignlanguage{english}{leftmost-innermost}) redexet redukálja először. A gyakorlatban ez azt jelenti, hogy egy függvény alkalmazása előtt a paramétereit (argumentumait) értékeli ki, a fában lentről felfelé haladva. Ez \aref{fig:strategy}.~ábrán a $\Kcomb(\Kcomb)(\Scomb)$ alkifejezésnek felel meg. A legtöbb modern imperatív és szigorú (\foreignlanguage{english}{strict}) funkcionális nyelv (pl. C++, Rust, OCaml) ezt használja.
-  \item Lusta kiértékelés (\foreignlanguage{english}{Lazy evaluation}): Hasonló a normál sorrendhez, de a gráfredukció (sharing) segítségével megjegyzi a már kiértékelt alkifejezéseket a memóriában, így elkerüli a többszöri, redundáns kiértékelést (ezt a megközelítést alkalmazza a Haskell).
+  \item Normál sorrend (\foreignlanguage{english}{Normal order} és \foreignlanguage{english}{Call-by-name}): Mindig a legbaloldalibb, legkülső (\foreignlanguage{english}{leftmost-outermost}) redexet választják ki. A gráfban ez a gyökértől balra haladva a legmagasabban fekvő kiemelt csomópont. A két stratégia között az a fő különbség, hogy míg a \foreignlanguage{english}{Normal order} egy nem applikált függvény törzsén belül is elvégzi a redukciós lépéseket, addig a \foreignlanguage{english}{Call-by-name} nem tesz ilyet, hanem megáll amint elér egy telítetlen absztrakciót (amelynek nincsen elég argumentuma ahhoz, hogy kiértékeljük). Ez utóbbi emiatt az úgynevezett \foreignlanguage{english}{Weak head normal form} állapotba hozza a kifejezéseket, ahol nincsen arra garancia, hogy az argumentumok között még nincsen kiértékelhető alkifejezés. A \foreignlanguage{english}{Normal order} esetén normálformába kerülnek a kifejezések, amit már nem lehet tovább egyszerűsíteni. Ez a két stratégia a redukálást \aref{fig:strategy}.~ábrán a $\Scomb(\Scomb(\Scomb)(\Scomb)(\Scomb(\Scomb)(\Kcomb(\Kcomb)(\Scomb))(\Scomb)))(\Scomb)(\Scomb)$ alkifejezéssel kezdené.
+  \item Applikatív sorrend (\foreignlanguage{english}{Applicative order} és \foreignlanguage{english}{Call-by-value}): A legbaloldalibb, legbelső (\foreignlanguage{english}{leftmost-innermost}) redexet redukálják először. Hasonló különbség létezik ezen két stratégia között is: a \foreignlanguage{english}{Call-by-value} nem végez kiértékelést az absztrakciók törzsén belül, míg az \foreignlanguage{english}{Applicative order} igen. A gyakorlatban ezek abban térnek el az előző pontban említett stratégiáktól, hogy egy függvény alkalmazása előtt -- amennyiben annak minden paramétere rendelkezésre áll -- az argumentumait értékeli ki, a fában lentről felfelé haladva. Ez a két stratégia a kiértékelést \aref{fig:strategy}.~ábrán a $\Kcomb(\Kcomb)(\Scomb)$ alkifejezéssel kezdené. A legtöbb modern imperatív és szigorú nyelv (pl. C++, Rust, OCaml) ezt használja.
 \end{itemize}
 
 A stratégiák oktatása azért kiemelten fontos, mert vannak olyan \ski-kalkulus kifejezések, amelyeknek a redukciója bizonyos stratégiákat alkalmazva végtelen ciklusba kerül. Tekintsük például az alábbi kifejezést:
 
-$$
+\[
   \Kcomb\Icomb((\Scomb\Icomb\Icomb)(\Scomb\Icomb\Icomb))
-$$
+\]
 
 Applikatív sorrend alkalmazásával, a gép először megpróbálja az argumentumokat ($(\Scomb\Icomb\Icomb)(\Scomb\Icomb\Icomb)$) teljesen kiértékelni, mielőtt a $\Kcomb$ kombinátort alkalmazná. Ez egy végtelen ciklust eredményez. Normál sorrend szerint viszont az algoritmus a legkülső redexet (a $\Kcomb$ applikációját) választja ki először, ezáltal a második argumentum (a divergáló kifejezés) eltűnik, és a kifejezés normál-formába kerül ($\Icomb$).
 
@@ -413,7 +410,15 @@ A kialakításban különösen figyeltem arra, hogy a redukciós logika modulár
   \label{fig:strategy}
 \end{figure}
 
-\newpage
+\subsubsection{A \lam-kalkulus}
+\label{sec:a-lam-kalkulus-impl}
+
+A \lam-kalkulus kiértékelése bizonyos szempontból bonyolultabb, mint a \ski-kalkulusé. Ez részben abból adódik, hogy a \lam-kalkulusban vannak változók. Létezik viszont a \lam-kalkulusnak egy olyan alakja, amely -- bár teljesen nem tud megszabadulni tőlük -- egyszerűbbé teszi a kezelésüket. Ez az alak, a de Bruijn forma\footnote{Az általam használt változata a lokálisan névtelen de Bruijn forma}\cite{chargueraudLocallyNamelessRepresentation2012b}. Ez a forma az úgynevezett de Bruijn indexeken alapul: egy \lam-kalkulus kifejezésben egy változó de Bruijn indexe az a szám, amely azt jelzi, hogy az őt "kötő" \lam-absztrakció hány szinttel van feljebb a kifejezés fájában. Például a \(\lam x.(\lam y. x)\) kifejezésben az \(x\) változó de Bruijn indexe \(2\), mivel az őt definiáló \lam-absztrakció (\(\lam x.\)) az két szinttel van feljebb. A kifejezés de Bruijn alakja tehát \(\lam\,\lam\,2\).
+
+Az én \lam-kalkulus kiértékelőm ilyen alakban végzi el a kiértékelést, mivel így a kiértékelés során nem kell külön figyelni az úgynevezett \(\alpha\)-ekvivalenciára. Ehhez meg kellett valósítanom a konverziót a tradícionális \lam-kalkulus és a de Bruijn forma között mindkét irányban. Ezek után a de Bruijn alakra definiáltam a \(\beta\)-redukciót, amely megfelel egy \lam-absztrakció kiértékelésének egy változóval. Ez után definiáltam a különböző stratégiákat, amelyek csak abban térnek el, hogy a kifejezésben éppen melyik alkifejezést \(\beta\)-redukálják.
+
+Három stratégiát valósítottam meg: \foreignlanguage{english}{Normal order}, \foreignlanguage{english}{Call-by-name} illetve \foreignlanguage{english}{Call-by-value}. Azért erre a háromra esett a választás, mert szerettem volna mind \foreignlanguage{english}{lazy} és \foreignlanguage{english}{eager}, mind normálformára és nem-normálformára hozó stratégiákat elérhetővé tenni.
+
 
 \subsection{A tesztelő orákulum kialakítása}
 \label{sec:a-teszt-orakulum-kialak}
@@ -421,6 +426,8 @@ A kialakításban különösen figyeltem arra, hogy a redukciós logika modulár
 A szoftver helyességének verifikálására a hagyományos egységtesztek mellett a \foreignlanguage{english}{Property-based testing} (tulajdonság-alapú tesztelés) módszertanát alkalmaztam. Ennek során a teszt-keretrendszer automatikusan generál valid, véletlenszerű \lam- és \ski-kifejezéseket, majd megvizsgálja a rendszer invariáns tulajdonságait.
 
 A redukciós gépek kimenetének validálásához egy tesztelő orákulumot alakítottam ki. Az orákulum egy már bizonyítottan helyesen működő, külső interpreter, amelyet egy elszigetelt Podman konténerben futtattam le a biztonság és a determinisztikus környezet garantálása érdekében. A tesztelési folyamat során a \texttt{lexor} és a Podman konténerben futó orákulum is kiértékelte ugyanazt a generált kifejezést, a teszt-keretrendszer pedig a két kimenet ekvivalenciáját vizsgálta \foreignlanguage{english}{Black-box} (fekete doboz) tesztelés formájában.
+
+\newpage
 
 \subsection{A vizuális redukciós elemek létrehozása}
 \label{sec:a-viz-reduk-elemek-letrehoz}
@@ -439,6 +446,8 @@ Egy ilyen vizuális reprezentáció \aref{fig:visuals}.~ábrán látható, amely
   \label{fig:visuals}
 \end{figure}
 
+\newpage
+
 \subsection{A frontend fejlesztése}
 \label{sec:a-frontend-fejl}
 
@@ -453,7 +462,7 @@ Az \href{https://egui.rs}{egui} grafikus keretrendszert használtam a felület k
   \centering
   \includegraphics[width=15cm]{ui}
   \captionsetup{justification=centering}
-  \caption{A grafikus felülete a programnak. A bal felső sarokban egy redukciós lánc látható. A képernyő alján a beviteli mező helyezkedik el, az aktuális bemenettel. A képernyő maradék részét a képernyőn kiválasztott kifejezés grafikonja tölti ki.}
+  \caption{A grafikus felülete a programnak. A jobb felső sarokban egy redukciós lánc látható. A bal felső sarokban egy \ski-kalkulus bemeneti ablak van, ahol megjelenik a megadott kifejezés \lam-kalkulusba konvertált alakja is. A bal alsó sarokban egy \lam-kalkulus bemenető ablak helyezkedik el. Végezetül a jobb alsó sarokban a megadott \ski-kalkulus kifejezéshez tartozó redukciós gráf egyik lépése látható.}
   \label{fig:ui}
 \end{figure}
 

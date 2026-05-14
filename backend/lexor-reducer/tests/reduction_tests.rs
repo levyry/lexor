@@ -1,8 +1,9 @@
-use lexor_reducer::{NF, ReductionStrat, WHNF};
+use lexor_reducer::SkiReductionStrat;
 
 #[test]
 fn subexpressions() {
-    let result = NF::reduce("SS(IIIK)(KIS(SKSIKSKISKISKSI)KS(IKSKSISKIS)KIS)");
+    let result =
+        SkiReductionStrat::NormalForm.reduce("SS(IIIK)(KIS(SKSIKSKISKISKSI)KS(IKSKSISKIS)KIS)");
 
     assert_eq!(result, Ok("SS(KS)".to_owned()));
 }
@@ -10,7 +11,8 @@ fn subexpressions() {
 #[test]
 fn church_expon() {
     // 2^3 = 8
-    let result = NF::reduce("(S(S(KS)K)(S(S(KS)K)(S(S(KS)K)I)))(S(S(KS)K)I)");
+    let result =
+        SkiReductionStrat::NormalForm.reduce("(S(S(KS)K)(S(S(KS)K)(S(S(KS)K)I)))(S(S(KS)K)I)");
 
     assert_eq!(
         result,
@@ -20,14 +22,15 @@ fn church_expon() {
 
 #[test]
 fn normal_form_exhaustion() {
-    let result = WHNF::reduce("S(SKSKSSK)(SSKSKSK)");
+    let result = SkiReductionStrat::WeakHeadNormalForm.reduce("S(SKSKSSK)(SSKSKSK)");
 
     assert_eq!(result, Ok("S(SKSKSSK)(SSKSKSK)".to_owned()));
 }
 
 #[test]
 fn ackermann_small() {
-    let result = NF::reduce("(S(S(KS)K)(S(S(KS)K)I))(S(S(KS)K)I)(S(S(KS)K)I)");
+    let result =
+        SkiReductionStrat::NormalForm.reduce("(S(S(KS)K)(S(S(KS)K)I))(S(S(KS)K)I)(S(S(KS)K)I)");
 
     assert_eq!(
         result,
@@ -37,7 +40,7 @@ fn ackermann_small() {
 
 #[test]
 fn six_factorial() {
-    let result = NF::reduce(
+    let result = SkiReductionStrat::NormalForm.reduce(
         "(S(S(KS)K)(S(K(S(S(KS)K)(S(S(KS)K)(S(S(KS)K)(S(S(KS)K)(S(S(KS)K)I))))))(S(S(KS)K)(S(S(KS)K)(S(S(KS)K)(S(S(KS)K)(S(S(KS)K)(S(S(KS)K)I))))))))(S(K(S(S(KS)K)I))(S(S(KS)K)(S(S(KS)K)(S(S(KS)K)(S(S(KS)K)(S(S(KS)K)I))))))",
     );
 

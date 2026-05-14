@@ -10,16 +10,6 @@ pub use engineview::EngineGraphNode;
 pub use engineview::EngineGraphNodeKind;
 pub use engineview::EngineView;
 pub use engineview::NodeRole;
-pub use graphred::{NF, ReductionError, ReductionStrat, WHNF};
+pub use graphred::{ReductionError as SkiReductionError, ReductionStrategy as SkiReductionStrat};
 pub use lambda::{LambdaEvalError, evaluate_lambda};
 pub use lexor_core::de_bruijn::LambdaReductionStrategy;
-
-mod seal {
-    use crate::graphred;
-
-    /// Seal traits so other crates can't implement anything that is sealed.
-    #[allow(unused)]
-    pub trait Sealed {}
-    impl Sealed for graphred::NormalForm {}
-    impl Sealed for graphred::WeakHeadNormalForm {}
-}

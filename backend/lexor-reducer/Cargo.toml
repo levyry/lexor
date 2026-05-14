@@ -19,7 +19,3 @@ lexor-parser = { workspace = true }
 
 [dev-dependencies]
 criterion = { version = "0.8", features = ["html_reports"] }
-
-[[bench]]
-name = "church"
-harness = false

@@ -190,7 +190,7 @@ impl LexorApp {
 
                 let request = ReductionRequest {
                     source_id,
-                    strategy: ApiStrategy::Ski(()),
+                    strategy: ApiStrategy::Ski(source.ski_strategy),
                     state: ReductionRequestState::Ski {
                         wants_steps,
                         wants_graph,

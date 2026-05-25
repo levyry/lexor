@@ -14,7 +14,7 @@
 #show: gruvbox-dark-theme.with(
   aspect-ratio: "16-9",
   config-info(
-    title: [Combinator Explorer],
+    title: [*Combinator Explorer*],
     author: [Orbán Levente],
     date: datetime.today(),
     institution: [Konzulens: Németh Gábor],
@@ -30,18 +30,18 @@
 #let green = rgb("#a9b665")
 
 #let milestones = (
-  (year: 1958, name: "LISP", desc: "Első osztályú függvények", dir: 1, color: blue),
+  (year: 1958, name: "LISP", desc: "első osztályú függvények", dir: 1, color: blue),
   (year: 1973, name: "ML", desc: "Hindley-Milner típusok\nés mintaillesztés", dir: -1, color: blue),
-  (year: 1983, name: "C++", desc: "Objektumorientált\nparadigma térnyerése", dir: 1, color: orange),
-  (year: 1995, name: "Java", desc: "Nagyvállalati OOP\nés virtuális gépek", dir: -1, color: orange),
-  (year: 2011, name: "C++11", desc: "Lambdák és constexpr\nrendszerszinten", dir: 1, color: green),
-  (year: 2020, name: "\"Modern\" OOP", desc: "Rekordok, mintaillesztés\n(Java, C#, Kotlin)", dir: -1, color: green),
-  (year: 2025, name: "Rust", desc: "Multiparadigmális\nnyelv a Linux kernelben", dir: 1, color: green),
+  (year: 1983, name: "C++", desc: "objektumorientált\nparadigma elterjedése", dir: 1, color: orange),
+  (year: 1996, name: "Java", desc: "OOP-ra alapozott\n(3 billion devices)", dir: -1, color: orange),
+  (year: 2011, name: "C++11", desc: "lambdák és constexpr", dir: 1, color: green),
+  (year: 2020, name: "\"modern\" OOP", desc: "rekordok, mintaillesztés\n(Java, C#, Kotlin)", dir: -1, color: green),
+  (year: 2025, name: "Rust", desc: "multiparadigmális\nnyelv a Linux kernelben", dir: 1, color: green),
 )
 
 #slide(
   repeat: milestones.len(),
-  title: [Paradigmaváltozás],
+  title: [paradigmaváltozás],
   self => {
     let step = self.subslide
 
@@ -114,133 +114,323 @@
   },
 )
 
-== Paradigmaváltozás
+#slide(title: [== paradigmaváltozás])[
+  - az újabb nyelvek már *multiparadigmálisak* (Rust, Kotlin)
+  #pause
+  - a régebbi nyelvek is efelé mozognak
+  #pause
+  - az eszközök (lambdák, mintaillesztés) mindennaposak lettek
+  #pause
+  - a mögöttes *matematikai alapok* idegenek a mérnöki közönség számára
+]
 
-- az újabb nyelvek már multiparadigmálisak (Rust, Kotlin)
-#pause
-- a régebbi nyelvek is efelé mozognak
-
-
-#speaker-note(
-  "
-- 90es évek: full OO
-- elmúlt 10-20 év: egyre több funkcionális elem => multi-paradigm
-  - C++11 constexpr
-  - Java/C\# records
-  - lambdas everywhere!
-  - [insert graph plot here]
-- we still mainly teach OO concepts, even though writing \"modern\" code requires using these new, shiny features
-  - how do they work?
-",
-)
-
-== Feladat
+== feladat
 
 #set quote(block: true)
 
 #quote(attribution: [Témakiírás])[
   [...] A hallgató feladata egy
-  - *webes eszköz* (Combinator Explorer) elkészítése, amely
-  - SKI-kifejezések esetén *megmutatja a redukciós lépéseket, vizualizálja a redexeket, és felrajzolja a kiértékelési fát*.
-  - A redukció során *többféle kiértékelési stratégiát támogat*, valamint az *SKI-kifejezéseket lefordítja λ-kalkulusba*. [...]
+  - *webes eszköz* (_Combinator Explorer_) elkészítése, amely
+  - SKI-kifejezések esetén megmutatja a *redukciós lépéseket*, vizualizálja a redexeket, és felrajzolja a *kiértékelési fát*.
+  - A redukció során többféle *kiértékelési stratégiát* támogat, valamint az SKI-kifejezéseket *lefordítja* λ-kalkulusba. [...]
 ]
 
-== Kezdeti állapot
-
-==
-
-== Test
-
-We can use `#pause` to #pause display something later.
+== kezdeti állapot
 
 #pause
+- Funkcionális programozás C++-ban szabvál $arrow$ *$lambda$-kalkulus*
+#pause
+- Stephen *Wolfram* írásai $arrow$ *SKI-kalkulus*
 
-Just like this.
-
-#meanwhile
-
-Meanwhile, #pause we can also use `#meanwhile` to #pause display other content synchronously.
-
-== Complex Animation
-
-At subslide #touying-fn-wrapper((self: none) => str(self.subslide)), we can
-
-use #uncover("2-")[`#uncover` function] for reserving space,
-
-use #only("2-")[`#only` function] for not reserving space,
-
-#alternatives[call `#only` multiple times \u{2717}][use `#alternatives` function #sym.checkmark] for choosing one of the alternatives.
-
-
-== Callback Style Animation
+== $lambda$-kalkulus és SKI-kalkulus
 
 #slide(
-  repeat: 3,
+  title: [$lambda$-kalkulus és SKI-kalkulus],
+  repeat: 9,
   self => [
     #let (uncover, only, alternatives) = utils.methods(self)
 
-    At subslide #self.subslide, we can
-
-    use #uncover("2-")[`#uncover` function] for reserving space,
-
-    use #only("2-")[`#only` function] for not reserving space,
-
-    #alternatives[call `#only` multiple times \u{2717}][use `#alternatives` function #sym.checkmark] for choosing one of the alternatives.
+    #grid(
+      columns: (1fr, 1fr),
+      gutter: 2em,
+      [
+        #uncover("1-")[*$lambda$-kalkulus:*]
+        #uncover("2-")[- általános célú, Turing-teljes nyelv]
+        #uncover("3-")[- változók, absztrakciók, applikációk]
+        #uncover("4-")[
+          #align(center + bottom)[
+            #rect(width: 100%, height: 120pt, fill: rgb("#3c3836"))[
+              #align(center + horizon)[
+                $
+                  lambda x. lambda y.(x+y)
+                $
+              ]
+            ]
+          ]
+        ]
+      ],
+      [
+        #uncover("5-")[*SKI-kalkulus:*]
+        #uncover("6-")[- Turing-teljes]
+        #uncover("7-")[- három kombinátor ($S$, $K$, $I$)]
+        #uncover("8-")[- változómentes]
+        #uncover("9-")[
+          #align(center + bottom)[
+            #rect(width: 100%, height: 120pt, fill: rgb("#3c3836"))[
+              #align(center + horizon)[
+                #align(center)[
+                  $
+                    S & = lambda x.(lambda y.(lambda z.x z(y z))) \
+                    K & = lambda x.(lambda y.x) \
+                    I & = lambda x.x
+                  $
+                ]
+              ]
+            ]
+          ]
+        ]
+      ],
+    )
   ],
 )
 
+== architektúra
 
-== Math Equation Animation
+#slide(
+  title: [architektúra],
+  repeat: 11,
+  self => [
+    #let (only,) = utils.methods(self)
 
-Equation with `pause`:
+    #only("1-10")[implementálási nyelv: *Rust*]
 
-$
-  f(x) & = pause x^2 + 2x + 1 \
-       & = pause (x + 1)^2 \
-$
+    #only("2-10")[*frontend (elm-architektúra)*]
+    #only("3-6")[- UI $arrow$ `update` $arrow$ `view` körforgás]
+    #only("4-6")[- message-queue alapú állapotkezelés]
+    #only("5-6")[- tisztán kliensoldali futás (*WASM*)]
+    #only("6-6")[- cpu-heavy redukciós számítások kiszervezése *Web Worker*-ekbe]
 
-#meanwhile
+    #only("7-10")[*backend (compiler felépítés)*]
+    #only("8-9")[- compiler frontend: lexer és parser]
+    #only("9-9")[- compiler backend: G-machine alapú redukciós gépek]
 
-Here, #pause we have the expression of $f(x)$.
+    #only("10")[*API réteg:* a frontend és backend között *facade* mintával]
+
+    #only("11")[
+      #block(width: 100%)[
+        #set text(size: 0.7em, fill: rgb("#d4be98"))
+
+        #align(center)[
+          #fletcher.diagram(
+            node-stroke: 1.2pt,
+            edge-stroke: 1pt + rgb("#d4be98"),
+            spacing: (1em, 2.5em),
+            {
+              let fg = rgb("#d4be98")
+              let bg = rgb("#1d2021")
+              let gray_bg = rgb("#3c3836")
+              let blue = rgb("#7daea3")
+              let green = rgb("#a9b665")
+              let orange = rgb("#e78a4e")
+
+              let fe_style = (fill: blue.darken(70%), stroke: blue, corner-radius: 3pt, inset: 0.5em)
+              let api_style = (fill: green.darken(70%), stroke: green, corner-radius: 3pt, inset: 0.5em)
+              let be_style = (fill: orange.darken(70%), stroke: orange, corner-radius: 3pt, inset: 0.5em)
+
+              let group_style = (
+                fill: gray_bg,
+                stroke: (paint: fg.darken(30%), dash: "solid"),
+                corner-radius: 5pt,
+                extrude: 0.5em,
+              )
+
+              node(enclose: ((0, 0), (-1, 1), (1, 1)), ..group_style)
+              node((0, -0.7), [*frontend*], stroke: none)
+
+              node(enclose: ((-1, 3), (1, 4)), ..group_style)
+              node((0, 4.7), [*backend*], stroke: none)
+
+              // --- FRONTEND ---
+              node((0, 0), `UI`, ..fe_style, name: <ui>)
+              node((-1, 1), `view`, ..fe_style, name: <view>)
+              node((1, 1), `update`, ..fe_style, name: <update>)
+
+              edge(<view>, <ui>, "->", label: [megjelenés], label-side: left, label-pos: 0.5, label-sep: 7pt)
+              edge(<ui>, <update>, "->", label: [üzenetek], label-side: left, label-pos: 0.5, label-sep: 7pt)
+              edge(<update>, <view>, "->", label: [új modell], label-side: left, label-pos: 0.5, label-sep: 7pt)
+
+              // --- API ---
+              node((0, 2), [`lexor-api`], ..api_style, width: 14em, name: <api>)
+
+              edge(
+                <api>,
+                <update>,
+                "<->",
+                label: [kérések / válaszok],
+                label-side: right,
+                label-fill: bg,
+                label-sep: 6pt,
+                label-anchor: "north-west",
+              )
+
+              // --- BACKEND ---
+              node((-1, 3), [$lambda$ lexer + parser], ..be_style, name: <lam-p>)
+              node((-1, 4), [$lambda$ redukciós gép], ..be_style, name: <lam-e>)
+
+              node((1, 3), [SKI lexer + parser], ..be_style, name: <ski-p>)
+              node((1, 4), [SKI redukciós gép], ..be_style, name: <ski-e>)
+
+              edge(<api>, <lam-p>, "<->")
+              edge(<api>, <ski-p>, "<->")
+              edge(<lam-p>, <lam-e>, "<->")
+              edge(<ski-p>, <ski-e>, "<->")
+            },
+          )
+        ]
+      ]
+    ]
+  ],
+)
+
+== redukciós gépek
+
+*graph reduction machine* (G-machine)
+
+#only("2-4")[tankönyvi algoritmus:]
+#only("2-4")[- csúcsok $arrow$ kombinátorok és applikáció]
+#only("3-4")[- magát az absztrakt szintaxisfát értékeljük ki]
+#only("4")[- közben módosítunk rajta]
+#only("5-7")[*optimalizált* algoritmus:]
+#only("6-7")[- új féle csúcs: *indirekció*]
+#only("7")[- #text(fill: rgb("#98971a"))[részfa megosztás]]
+#only("8-")[*optimalizált* algoritmus]
+
+#only("8-11")[adatszerkezet:]
+#only("9-10")[- hagyományosan: rekurzív, pointer alapú AST]
+#only("10")[- #text(fill: rgb("#cc241d"))[pointer chasing! folyamatos allokációk!]]
+#only("11")[- #strike[rekurzív, pointer alapú AST]]
+#only("11")[- aréna allokátor alapú Flat-AST]
+#only("12-")[adatszerkezet]
+
+#only("12-")[stratégiák:]
+#only("13-")[- normál sorrend (leftmost-outmost)]
+#only("14-")[- applikatív sorrend (leftmost-innermost)]
+#only("15-")[- call-by-name/call-by-value (argumentumok kiértékelése)]
+
+== stratégiák
+
+#align(center)[
+  #rect(width: 72.6%, height: 100%, fill: rgb("#3c3836"), stroke: rgb("#e78a4e") + 2pt)[
+    #image("./strategy_base.png")
+  ]
+]
+
+== stratégiák (normal order)
+
+#align(center)[
+  #rect(width: 72.6%, height: 100%, fill: rgb("#3c3836"), stroke: rgb("#e78a4e") + 2pt)[
+    #image("./strategy_first.png")
+  ]
+]
+
+== stratégiák (applicative order)
+
+#align(center)[
+  #rect(width: 72.6%, height: 100%, fill: rgb("#3c3836"), stroke: rgb("#e78a4e") + 2pt)[
+    #image("./strategy_second.png")
+  ]
+]
+
+== $lambda$-kalkulus specifikus kihívások
+
+#only("1-2")[a $lambda$-kalkulus kiértékelése bonyolultabb]
+#only("2")[- változónevek ($alpha$-ekvivalencia)]
+#only("3-6")[*de Bruijn-indexek:*]
+#only("4-6")[- nevek $arrow$ indexek (számok)]
+#only("5-6")[- hány szinttel feljebb található az őt kötő $lambda$-absztrakció]
+#only("6")[
+  $
+    lambda x.lambda y. x arrow.double.r.l.long lambda lambda 2
+  $
+]
+#only("7-8")[*de Bruijn-indexek*]
+
+#only("7-8")[oda-vissza konverzió a tradicionális alak és a de Bruijn-forma között]
+
+#only("8")[(ez segít a SKI $arrow lambda$ konverzióban is)]
+
+== tesztelés
+
+egységtesztek mellett *property-based testing*
+#only("2")[- hasonló a fuzzinghoz]
+
+#only("3-")[*orákulum:*]
+#only("4-")[- külső, helyes interpreter futtatása konténerben]
+#only("5-")[- eredmények összehasonlítása]
+
+== visuals
+
+- a backend JSON-ként továbbítja a redukciós fát
+#pause
+- a frontend *szemantikailag* színezve jeleníti meg a kifejezéseket
+
+== visuals
+
+#align(center)[
+  #rect(width: 34%, height: 100%, fill: rgb("#3c3836"), stroke: rgb("#e78a4e") + 2pt)[
+    #image("./visuals.png")
+  ]
+]
+
+== visuals
+
+- a backend JSON-ként továbbítja a redukciós fát
+- a frontend *szemantikailag* színezve jeleníti meg a kifejezéseket
+#pause
+- gráf konverzió minden egyes állapothoz
+#pause
+- agresszív cachelés
+
+== ui
+
+- egui keretrendszer (Dear ImGui feel)
+#pause
+- *immediate-mode* GUI
+#pause
+- docking support (compiler explorer feel)
+
+== ui
+
+#align(center)[
+  #rect(width: 83%, height: 100%, fill: rgb("#3c3836"), stroke: rgb("#e78a4e") + 2pt)[
+    #image("./ui.png")
+  ]
+]
+
+== hova tovább?
 
 #pause
+- indirekció ki/be kapcsolása
+#pause
+- *guided learning* mód
+#pause
+- nyelvtan bővítése új elemekkel (számok, műveletek)
+#pause
+- $lambda arrow$ SKI konverzió
+#pause
+- frontend személyre szabhatóságának növelése
 
-By factorizing, we can obtain this result.
+== összegzés
 
-= Theorems
+#pause
+- egy *interaktív* felület a SKI-kalkulussal való ismerkedésre
+#pause
+- gyors redukció #pause (mind lépésszám, mind cpu cycles terén)
+#pause
+- intuitív vizuális segítő elemek
 
-= Others
+==
 
-== Multiple columns
-
-#cols[
-  First column.
-][
-  Second column.
+#align(center + horizon)[
+  #text(size: 2em, weight: "bold")[Köszönöm a figyelmet!]
 ]
-
-== Multiple columns with equal height blocks
-
-#cols(columns: (1fr, 1fr), gutter: 1em)[
-  #emph-block[
-    First column with equal height: #lorem(10)
-    #lazy-v(1fr)
-  ]
-][
-  #emph-block[
-    Second column with equal height: : #lorem(15)
-    #lazy-v(1fr)
-  ]
-]
-
-
-== Multiple Pages
-
-#show: appendix
-
-= Appendix
-
-== Appendix
-
-Please pay attention to the current slide number.
-

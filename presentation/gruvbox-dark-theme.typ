@@ -4,11 +4,10 @@
   if title != auto {
     self.store.title = title
   }
-  
+
   let header(self) = {
-    set align(top)
     show: components.cell.with(fill: self.colors.neutral-lightest, inset: 1em)
-    set align(center + horizon)
+    set align(top + center)
     set text(weight: "bold", size: 1.5em)
     if self.store.title != none {
       utils.call-or-display(self, self.store.title)
@@ -16,7 +15,7 @@
       utils.display-current-heading(level: 2)
     }
   }
-  
+
   let footer(self) = {
     set align(bottom)
     show: pad.with(.4em)
@@ -25,7 +24,7 @@
     h(1fr)
     context utils.slide-counter.display() + " / " + utils.last-slide-number
   }
-  
+
   self = utils.merge-dicts(
     self,
     config-page(
@@ -47,20 +46,18 @@
       text(size: 2.5em, weight: "bold", info.title),
     )
     set text(fill: self.colors.neutral-darkest)
-    if info.author != none { 
+    if info.author != none {
       block(
-        info.author
-      ) 
+        info.author,
+      )
     }
     if info.institution != none and info.date != none {
       align(bottom + center, block[
-          #text(size: 0.7em, info.institution)
-          #h(1fr)
-          #text(size: 0.7em, utils.display-info-date(self))
+        #text(size: 0.7em, info.institution)
+        #h(1fr)
+        #text(size: 0.7em, utils.display-info-date(self))
       ])
-      
     }
-
   }
   self = utils.merge-dicts(self, config-page(fill: self.colors.neutral-lightest))
   touying-slide(self: self, body)
@@ -87,14 +84,14 @@
   show: touying-slides.with(
     config-page(
       paper: "presentation-" + aspect-ratio,
-      margin: (top: 6em, bottom: 1.5em, x: 2em),
+      margin: (top: 4em, bottom: 1.5em, x: 2em),
     ),
     config-common(
       slide-fn: slide,
       new-section-slide-fn: new-section-slide,
     ),
     config-methods(alert: utils.alert-with-primary-color),
-    
+
     config-colors(
       primary: rgb("#e78a4e"),
       secondary: rgb("#a9b665"),

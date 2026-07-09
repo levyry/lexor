@@ -13,5 +13,5 @@
 read line
 
 echo "Beérkező kérés: $line" >&2
-res=$(npx ski eval $line)
-echo -e "$res"
+res=$(npx ski eval -q --max 100000 "$line")
+[ "$?" = "0" ] && echo -e "$res"

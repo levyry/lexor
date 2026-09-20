@@ -20,6 +20,7 @@ pub use lexor_reducer::{LambdaReductionStrategy, SkiReductionStrat};
 use serde::{Deserialize, Serialize};
 pub use source_id::SourceID;
 pub use strategy::ApiStrategy;
+use wasm_bindgen::prelude::wasm_bindgen;
 
 #[derive(Debug, Serialize, Deserialize, Clone, PartialEq, Eq, PartialOrd, Ord, Hash)]
 #[serde(tag = "type")]
@@ -147,4 +148,30 @@ pub fn reduce_expression(req: &ReductionRequest) -> ReductionResponse {
 
 pub fn convert_ski_to_lambda_string(input: &str) -> Result<String, String> {
     lexor_convert::convert_ski_to_lambda(input)
+}
+
+#[wasm_bindgen]
+pub fn process_worker_job(request_json: &str) -> String {
+    let task_result: Result<WorkerTask, serde_json::Error> = serde_json::from_str(request_json);
+
+    let worker_result = match task_result {
+        Ok(WorkerTask::Reduction(req)) => {
+            let response = reduce_expression(&req);
+            WorkerResult::Reduction(response)
+        }
+        Ok(WorkerTask::Conversion { source_id, input }) => {
+            let result_str = convert_ski_to_lambda_string(&input).unwrap_or_else(|err| err);
+
+            WorkerResult::Conversion {
+                source_id,
+                result: result_str,
+            }
+        }
+        Err(e) => {
+            return format!(r#"{{"error": "Failed to parse worker task: {}"}}"#, e);
+        }
+    };
+
+    serde_json::to_string(&worker_result)
+        .unwrap_or_else(|_| r#"{"error": "Serialization failed"}"#.to_owned())
 }

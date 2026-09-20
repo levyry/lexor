@@ -6,7 +6,6 @@ members = [
     "./backend/lexor-parser",
     "./backend/lexor-convert",
     "./frontend/lexor-api",
-    "./frontend/lexor-wasm",
 ]
 
 [workspace.dependencies]
@@ -16,12 +15,10 @@ lower = "0.2.1"
 thiserror = "2.0.18"
 arrayvec = "0.7.6"
 serde = { version = "1.0.*", features = ["derive"] }
-serde_json = "1.0.*"
 lexor-core = { path = "./backend/lexor-core", version = "*" }
 lexor-parser = { path = "./backend/lexor-parser", version = "*" }
 lexor-reducer = { path = "./backend/lexor-reducer", version = "*" }
 lexor-convert = { path = "./backend/lexor-convert", version = "*" }
-lexor-api = { path = "./frontend/lexor-api", version = "*" }
 
 [workspace.package]
 edition = "2024"
@@ -32,26 +29,23 @@ description = "A compiler and VM for lambda calculus targeting combinators."
 [workspace.lints.clippy]
 pedantic = { level = "warn", priority = -1 }
 nursery = { level = "warn", priority = -1 }
-# cargo = { level = "deny", priority = -1 } # TODO: Enable before publishing crates
 
 # Harden
 ## Stops panics
 # TODO: Enable all of these when main functionality is done
 unwrap_used = "deny"
-# expect_used = "deny"
+expect_used = "warn"
 indexing_slicing = "deny"
 arithmetic_side_effects = "deny"
-# unreachable = "deny"
+unreachable = "deny"
 unimplemented = "deny"
 unchecked_time_subtraction = "deny"
-# todo = "deny"
+todo = "warn"
 string_slice = "deny"
 panic_in_result_fn = "deny"
 panic = "deny"
 exit = "deny"
 as_conversions = "deny"
-missing_panics_doc = "allow" # TODO: remove this
-missing_errors_doc = "allow" # TODO: remove this
 ## Restrictions
 if_then_some_else_none = "deny"
 str_to_string = "deny"
@@ -70,11 +64,6 @@ panic = "abort"
 opt-level = 3
 
 [profile.release-small]
-inherits = "release"
-opt-level = "s"
-strip = true
-
-[profile.release.package.lexor-wasm]
 inherits = "release"
 opt-level = "s"
 strip = true

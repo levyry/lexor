@@ -10,5 +10,4 @@ workspace = true
 
 [dependencies]
 lower = { workspace = true }
-thiserror = { workspace = true }
 serde = { workspace = true }

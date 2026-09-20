@@ -1,0 +1,36 @@
+@import "tailwindcss";
+
+html,
+body,
+#app {
+	width: 100vw;
+	height: 100vh;
+	margin: 0;
+	background: #1e1e1e;
+	color: #d4d4d4;
+}
+
+.lm_header .lm_tab {
+	min-width: 30px;
+	overflow: hidden;
+}
+
+.lm_header .lm_tab .lm_title {
+	white-space: nowrap !important;
+	overflow: hidden !important;
+	text-overflow: ellipsis !important;
+	display: inline-block;
+	max-width: 100%;
+	vertical-align: middle;
+}
+
+.lm_header .lm_tab.lm_focused,
+.lm_header .lm_tab.lm_active.lm_focused {
+	background-color: #1e1e1e !important;
+	color: #ffffff !important;
+}
+
+.lm_header .lm_tab.lm_active {
+	background-color: #1e1e1e !important;
+	color: #ffffff !important;
+}

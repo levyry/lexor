@@ -1,0 +1,39 @@
+[env]
+CARGO_MAKE_EXTEND_WORKSPACE_MAKEFILE = true
+
+[tasks.build-wasm]
+workspace = false
+cwd = "./frontend/lexor-api"
+command = "wasm-pack"
+args = [
+    "build",
+    "--target",
+    "web",
+    "--out-dir",
+    "../combinator-explorer/src/wasm",
+]
+
+[tasks.dev-ui]
+workspace = false
+cwd = "./frontend/combinator-explorer"
+command = "npm"
+args = ["run", "dev"]
+
+[tasks.install-ui]
+workspace = false
+cwd = "./frontend/combinator-explorer"
+command = "npm"
+args = ["install"]
+
+[tasks.watch-wasm]
+workspace = false
+command = "cargo"
+args = [
+    "watch",
+    "-w",
+    "backend",
+    "-w",
+    "frontend/lexor-api/src",
+    "-s",
+    "cargo make build-wasm",
+]

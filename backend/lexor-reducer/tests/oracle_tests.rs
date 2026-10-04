@@ -1,3 +1,12 @@
+#![allow(
+    clippy::unwrap_used,
+    clippy::expect_used,
+    clippy::panic,
+    clippy::arithmetic_side_effects,
+    clippy::pedantic,
+    clippy::nursery
+)]
+
 use lexor_reducer::SkiReductionStrat;
 use proptest::prelude::*;
 use proptest::test_runner::{Config, TestRunner};
@@ -55,8 +64,7 @@ fn ask_oracle(expr: &str) -> Result<String, io::Error> {
 
     let cleaned_result = result
         .lines()
-        .filter(|line| !line.trim().is_empty())
-        .last()
+        .rfind(|line| !line.trim().is_empty())
         .unwrap_or("")
         .trim()
         .to_owned();

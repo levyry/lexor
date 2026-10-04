@@ -6,7 +6,6 @@ authors.workspace = true
 description.workspace = true
 
 [dependencies]
-chumsky = { workspace = true }
 thiserror = { workspace = true }
 lexor-core = { workspace = true }
 serde = { workspace = true }

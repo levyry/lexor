@@ -49,6 +49,7 @@ impl Arena {
                 let r_key = self.flatten(*rhs);
                 self.0.insert(Node::App(l_key, r_key))
             }
+            Combinator::Primitive(p) => self.0.insert(Node::Prim(p)),
         }
     }
 

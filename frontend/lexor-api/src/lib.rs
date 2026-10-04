@@ -84,6 +84,7 @@ pub fn reduce_expression(req: &ReductionRequest) -> ReductionResponse {
                             EngineGraphNodeKind::Comb(node_comb) => {
                                 ApiGraphNodeKind::Comb(node_comb.into())
                             }
+                            EngineGraphNodeKind::Prim(lit) => ApiGraphNodeKind::Prim(lit),
                         };
 
                         NodeData {
@@ -142,14 +143,20 @@ pub fn reduce_expression(req: &ReductionRequest) -> ReductionResponse {
             },
         }
     } else {
-        unreachable!("WorkerRequestState corrupted");
+        ReductionResponse {
+            source_id: req.source_id,
+            state: ReductionResponseState::Lambda { output: None },
+            error: Some("WorkerRequestState corrupted".to_owned()),
+        }
     }
 }
 
+#[allow(clippy::missing_errors_doc)]
 pub fn convert_ski_to_lambda_string(input: &str) -> Result<String, String> {
     lexor_convert::convert_ski_to_lambda(input)
 }
 
+#[must_use]
 #[wasm_bindgen]
 pub fn process_worker_job(request_json: &str) -> String {
     let task_result: Result<WorkerTask, serde_json::Error> = serde_json::from_str(request_json);
@@ -168,7 +175,7 @@ pub fn process_worker_job(request_json: &str) -> String {
             }
         }
         Err(e) => {
-            return format!(r#"{{"error": "Failed to parse worker task: {}"}}"#, e);
+            return format!(r#"{{"error": "Failed to parse worker task: {e}"}}"#);
         }
     };
 

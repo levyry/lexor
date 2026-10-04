@@ -1,4 +1,4 @@
-//! A crate for efficiently parsing and reducing SKI combinator expressions.
+#![allow(clippy::missing_errors_doc)]
 
 pub mod core;
 mod engineview;

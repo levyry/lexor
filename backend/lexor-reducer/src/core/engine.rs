@@ -1,6 +1,6 @@
 use arrayvec::ArrayVec;
 use lexor_core::combinator::Combinator;
-use lower::saturating::math as saturating;
+use lexor_core::literal::Literal;
 use serde::{Deserialize, Serialize};
 use thiserror::Error;
 
@@ -82,7 +82,7 @@ impl Engine {
                     self.spine.push(current);
                     current = *lhs;
                 }
-                Ok(Node::Comb(_)) => {
+                Ok(Node::Comb(_) | Node::Prim(_)) => {
                     self.spine.push(current);
                     break;
                 }
@@ -90,12 +90,56 @@ impl Engine {
                 Ok(Node::Indirection(_)) => {
                     current = self.resolve_indirection(current);
                 }
+
                 Err(err) => {
                     return Err(EngineError::MissingKey(err));
                 }
             }
         }
         Ok(())
+    }
+
+    fn eval_num_whnf(&mut self, mut key: NodeKey) -> Result<Option<i64>> {
+        while let Ok(Node::Indirection(target)) = self.arena.get(key) {
+            key = *target;
+        }
+        match self.arena.get(key) {
+            Ok(Node::Prim(Literal::Num(n))) => Ok(Some(*n)),
+            Ok(Node::App(_, _)) => {
+                // Reduce this sub-expression to WHNF
+                let saved_spine = std::mem::take(&mut self.spine);
+                let saved_root = self.subtree_root;
+                self.subtree_root = key;
+
+                let mut prev = ReductionState::Reduced;
+                while prev == ReductionState::Reduced {
+                    let curr = if let Some(&end) = self.spine.last() {
+                        match self.arena.get(end)? {
+                            Node::App(lhs, _) => *lhs,
+                            _ => end,
+                        }
+                    } else {
+                        self.subtree_root
+                    };
+                    self.unwind(curr)?;
+                    prev = self.reduce()?;
+                }
+
+                self.subtree_root = saved_root;
+                self.spine = saved_spine;
+
+                // After reducing to WHNF, check again
+                while let Ok(Node::Indirection(target)) = self.arena.get(key) {
+                    key = *target;
+                }
+                if let Ok(Node::Prim(Literal::Num(n))) = self.arena.get(key) {
+                    Ok(Some(*n))
+                } else {
+                    Ok(None)
+                }
+            }
+            _ => Ok(None),
+        }
     }
 
     // SAFETY: Since we took `arg_count` amount of elements from the spine,
@@ -105,54 +149,90 @@ impl Engine {
     pub(crate) fn reduce(&mut self) -> Result<ReductionState> {
         let redex_key = self.spine.pop().ok_or(EngineError::EmptySpine)?;
 
-        let &Node::Comb(redex) = self.arena.get(redex_key).map_err(EngineError::MissingKey)? else {
-            return Err(EngineError::BadReduce);
-        };
+        let head_node = *self.arena.get(redex_key).map_err(EngineError::MissingKey)?;
 
-        let arg_count = redex.arity();
+        match head_node {
+            Node::Comb(redex) => {
+                let arg_count = redex.arity();
+                let spine_len = self.spine.len();
 
-        let spine_len = self.spine.len();
+                if spine_len < arg_count {
+                    self.spine.push(redex_key);
+                    return Ok(ReductionState::Halted);
+                }
 
-        if spine_len < arg_count {
-            self.spine.push(redex_key);
-            return Ok(ReductionState::Halted);
+                let drain_index = spine_len.saturating_sub(arg_count);
+                let roots: ArrayVec<NodeKey, 3> =
+                    self.spine.drain(drain_index..spine_len).collect();
+
+                // TODO: Look into refactoring this to be prettier maybe?
+                let args: Result<ArrayVec<NodeKey, 3>> = roots
+                    .iter()
+                    .rev()
+                    .map(|&key| self.arena.get_arg(key))
+                    .try_fold(ArrayVec::<NodeKey, 3>::new(), |mut unrolled, result| {
+                        unrolled.push(result?);
+                        Ok(unrolled)
+                    });
+
+                let args = args?;
+
+                let result = match redex {
+                    NodeComb::I | NodeComb::K => Node::Indirection(args[0]),
+                    NodeComb::S => {
+                        let xz = self.arena.insert(Node::App(args[0], args[2]));
+                        let yz = self.arena.insert(Node::App(args[1], args[2]));
+                        Node::App(xz, yz)
+                    }
+                    NodeComb::B => {
+                        let yz = self.arena.insert(Node::App(args[1], args[2]));
+                        Node::App(args[0], yz)
+                    }
+                    NodeComb::C => {
+                        let xz = self.arena.insert(Node::App(args[0], args[2]));
+                        Node::App(xz, args[1])
+                    }
+                };
+
+                self.arena.replace(roots[0], result);
+                Ok(ReductionState::Reduced)
+            }
+            Node::Prim(Literal::Op(op)) => {
+                let arg_count = op.arity();
+                let spine_len = self.spine.len();
+
+                if spine_len < arg_count {
+                    self.spine.push(redex_key);
+                    return Ok(ReductionState::Halted);
+                }
+
+                let app1_index = spine_len.saturating_sub(1);
+                let app0_index = spine_len.saturating_sub(2);
+                let app1_key = self.spine[app1_index];
+                let app0_key = self.spine[app0_index];
+                let arg0_key = self.arena.get_arg(app1_key)?;
+                let arg1_key = self.arena.get_arg(app0_key)?;
+
+                let num0 = self.eval_num_whnf(arg0_key)?;
+                let num1 = self.eval_num_whnf(arg1_key)?;
+
+                if let (Some(n0), Some(n1)) = (num0, num1)
+                    && let Some(res) = op.apply(n0, n1)
+                {
+                    let drain_index = spine_len.saturating_sub(arg_count);
+                    let roots: ArrayVec<NodeKey, 3> =
+                        self.spine.drain(drain_index..spine_len).collect();
+                    self.arena.replace(roots[0], Node::Prim(Literal::Num(res)));
+                    return Ok(ReductionState::Reduced);
+                }
+
+                self.spine.push(redex_key);
+                Ok(ReductionState::Halted)
+            }
+            _ => {
+                self.spine.push(redex_key);
+                Ok(ReductionState::Halted)
+            }
         }
-
-        let drain_index = saturating! { spine_len - arg_count };
-
-        let roots: ArrayVec<NodeKey, 3> = self.spine.drain(drain_index..spine_len).collect();
-
-        // TODO: Look into refactoring this to be prettier maybe?
-        let args: Result<ArrayVec<NodeKey, 3>> = roots
-            .iter()
-            .rev()
-            .map(|&key| self.arena.get_arg(key))
-            .try_fold(ArrayVec::<NodeKey, 3>::new(), |mut unrolled, result| {
-                unrolled.push(result?);
-                Ok(unrolled)
-            });
-
-        let args = args?;
-
-        let result = match redex {
-            NodeComb::I | NodeComb::K => Node::Indirection(args[0]),
-            NodeComb::S => {
-                let xz = self.arena.insert(Node::App(args[0], args[2]));
-                let yz = self.arena.insert(Node::App(args[1], args[2]));
-                Node::App(xz, yz)
-            }
-            NodeComb::B => {
-                let yz = self.arena.insert(Node::App(args[1], args[2]));
-                Node::App(args[0], yz)
-            }
-            NodeComb::C => {
-                let xz = self.arena.insert(Node::App(args[0], args[2]));
-                Node::App(xz, args[1])
-            }
-        };
-
-        self.arena.replace(roots[0], result);
-
-        Ok(ReductionState::Reduced)
     }
 }

@@ -1,3 +1,4 @@
+use lexor_core::literal::Literal;
 use serde::{Deserialize, Serialize};
 
 use crate::visual::VisualComb;
@@ -6,6 +7,7 @@ use crate::visual::VisualComb;
 pub enum ApiGraphNodeKind {
     App,
     Comb(VisualComb),
+    Prim(Literal),
 }
 
 #[derive(Debug, Serialize, Deserialize, Clone, PartialEq, Eq, PartialOrd, Ord, Hash)]

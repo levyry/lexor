@@ -3,7 +3,8 @@ use core::{
     hash::Hash,
 };
 
-use lexor_parser::ski_parser::{ParsingError::ChumskyError, chumsky_parse as parse};
+use lexor_core::literal::Literal;
+use lexor_parser::parse_ski;
 use serde::{Deserialize, Serialize};
 use thiserror::Error;
 
@@ -22,7 +23,7 @@ pub enum ReductionError {
     #[error("Engine error: {0}")]
     Engine(#[from] crate::core::engine::EngineError),
     #[error("Parsing error: {0}")]
-    Parsing(#[from] lexor_parser::ski_parser::ParsingError),
+    Parsing(#[from] lexor_parser::ParsingError),
 }
 
 type Result<T> = core::result::Result<T, ReductionError>;
@@ -57,8 +58,6 @@ impl ReductionStrategy {
                         }
                     }
                 }
-
-                Ok(())
             }
             Self::WeakHeadNormalForm => {
                 let mut prev_reduction = ReductionState::Reduced;
@@ -75,10 +74,12 @@ impl ReductionStrategy {
 
                     engine.unwind(current)?;
 
-                    let is_reducible = if let Some(&head_key) = engine.spine.last()
-                        && let Ok(Node::Comb(comb)) = engine.arena.get(head_key)
-                    {
-                        engine.spine.len() > comb.arity()
+                    let is_reducible = if let Some(&head_key) = engine.spine.last() {
+                        match engine.arena.get(head_key) {
+                            Ok(Node::Comb(comb)) => engine.spine.len() > comb.arity(),
+                            Ok(Node::Prim(Literal::Op(op))) => engine.spine.len() > op.arity(),
+                            _ => false,
+                        }
                     } else {
                         false
                     };
@@ -89,14 +90,14 @@ impl ReductionStrategy {
 
                     prev_reduction = engine.reduce()?;
                 }
-
-                Ok(())
             }
         }
+
+        Ok(())
     }
 
     pub fn reduce(&self, input: &str) -> Result<String> {
-        let root = parse(input).map_err(|_| ChumskyError)?;
+        let root = parse_ski(input)?;
 
         let mut engine = Engine::from_tree(root);
 
@@ -106,7 +107,8 @@ impl ReductionStrategy {
     }
 
     pub fn reduce_with(&self, input: &str, mut callback: impl FnMut(EngineView)) -> Result<String> {
-        let root = parse(input).map_err(|_| ChumskyError)?;
+        let root = parse_ski(input)?;
+
         let mut engine = Engine::from_tree(root);
 
         self.perform(&mut engine, &mut Some(&mut callback))?;
@@ -118,7 +120,8 @@ impl ReductionStrategy {
     }
 
     pub fn compute_with(&self, input: &str, mut callback: impl FnMut(EngineView)) -> Result<()> {
-        let root = parse(input).map_err(|_| ChumskyError)?;
+        let root = parse_ski(input)?;
+
         let mut engine = Engine::from_tree(root);
 
         self.perform(&mut engine, &mut Some(&mut callback))?;

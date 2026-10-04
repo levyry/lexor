@@ -10,7 +10,6 @@ workspace = true
 
 [dependencies]
 serde = { workspace = true }
-lower = { workspace = true }
 slotmap = { workspace = true }
 arrayvec = { workspace = true }
 thiserror = { workspace = true }

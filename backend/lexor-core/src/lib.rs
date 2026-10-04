@@ -1,54 +1,49 @@
-/*!
-This crate provides several algorithms for parsing and converting between
-different [Lambda calculus] and [Combinatory calculi] representations.
-
-TODO: Finish once done with crate. Add example.
-
-[Lambda calculus]: https://en.wikipedia.org/wiki/Lambda_calculus
-[Combinator]: https://en.wikipedia.org/wiki/Combinatory_logic
-*/
 #![feature(iter_advance_by)]
-
 pub mod de_bruijn;
+pub mod literal;
 mod name_generator;
 
+pub use literal::{ArithOp, Literal};
+
 pub mod lambda {
-    /*!
-    This module provides a definition for a Lambda calculus term in the
-    standard representation. This is only used for parsing.
-
-    TODO: Finish docs, add example
-    */
-
+    use crate::{
+        combinator::Combinator, de_bruijn::DeBruijn, literal::Literal,
+        name_generator::NameGenerator,
+    };
     use core::fmt;
+    use serde::{Deserialize, Serialize};
 
-    use crate::{combinator::Combinator, de_bruijn::DeBruijn, name_generator::NameGenerator};
-
-    /// Represents an untyped lambda calculus term (not using De Bruijn indexing).
-    #[derive(Clone, Debug, PartialEq, Eq)]
+    #[derive(Clone, Debug, PartialEq, Eq, Serialize, Deserialize)]
     pub enum Lambda {
-        /// Variable
         Var(String),
-        /// Abstraction
         Abs(String, Box<Self>),
-        /// Application
         App(Box<Self>, Box<Self>),
+        Primitive(Literal),
     }
 
     impl fmt::Display for Lambda {
         fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
             match self {
                 Self::Var(name) => write!(f, "{name}"),
-                Self::Abs(name, lambda_expr) => write!(f, "λ{name}.{lambda_expr}"),
-                Self::App(lhs, rhs) if let Self::App(_, _) = **rhs => write!(f, "({lhs})({rhs})"),
-                Self::App(lhs, rhs) => write!(f, "({lhs}){rhs}"),
+                Self::Abs(name, lambda_expr) => write!(f, " \\{name}.{lambda_expr}"),
+                Self::App(lhs, rhs) => {
+                    if let Self::App(op_box, left) = &**lhs
+                        && let Self::Primitive(Literal::Op(op)) = &**op_box
+                    {
+                        write!(f, "({left} {op} {rhs})")
+                    } else if matches!(**rhs, Self::App(_, _)) {
+                        write!(f, "({lhs})({rhs})")
+                    } else {
+                        write!(f, "({lhs}){rhs}")
+                    }
+                }
+                Self::Primitive(p) => write!(f, "{p}"),
             }
         }
     }
 
     impl TryFrom<DeBruijn> for Lambda {
         type Error = String;
-
         fn try_from(value: DeBruijn) -> Result<Self, Self::Error> {
             fn convert(
                 db: DeBruijn,
@@ -63,30 +58,23 @@ pub mod lambda {
                             .nth(index)
                             .ok_or_else(|| "De Bruijn index out of bounds".to_owned())?
                             .clone();
-
                         Ok(Lambda::Var(name))
                     }
-
                     DeBruijn::FVar(name) => Ok(Lambda::Var(name)),
-
                     DeBruijn::Abs(body) => {
                         let name = alphabet.next().ok_or("Ran out of names")?;
-
                         scope.push(name.clone());
-
                         let body_lambda_expr = convert(*body, scope, alphabet)?;
-
                         scope.pop();
-
                         Ok(Lambda::Abs(name, Box::new(body_lambda_expr)))
                     }
                     DeBruijn::App(lhs, rhs) => Ok(Lambda::App(
                         Box::new(convert(*lhs, scope, alphabet)?),
                         Box::new(convert(*rhs, scope, alphabet)?),
                     )),
+                    DeBruijn::Primitive(p) => Ok(Lambda::Primitive(p)),
                 }
             }
-
             convert(value, &mut Vec::new(), &mut NameGenerator::new())
         }
     }
@@ -98,13 +86,11 @@ pub mod lambda {
                     Lambda::Var(stringify!($name).to_string())
                 };
             }
-
             macro_rules! abs {
                 ($arg:ident, $body:expr) => {
                     Lambda::Abs(stringify!($arg).to_string(), Box::new($body))
                 };
             }
-
             macro_rules! app {
                 ($lhs:expr, $rhs:expr) => {
                     Lambda::App(Box::new($lhs), Box::new($rhs))
@@ -124,44 +110,33 @@ pub mod lambda {
                 Combinator::B => abs!(x, abs!(y, abs!(z, app!(var!(x), app!(var!(y), var!(z)))))),
                 Combinator::C => abs!(x, abs!(y, abs!(z, app!(app!(var!(x), var!(z)), var!(y))))),
                 Combinator::App(lhs, rhs) => app!((*lhs).into(), (*rhs).into()),
+                Combinator::Primitive(p) => Self::Primitive(p),
             }
         }
     }
 }
 
 pub mod combinator {
-    /*!
-    This module provides a definition for a [`Combinator`]. This is only used
-    for parsing.
-
-    TODO: Finish docs, add example
-    */
-
     use core::fmt;
     use std::ops::BitAnd;
 
-    /// Represents a SKI combinator term. Supports free variables, and the
-    /// following combinators: S, K, I, B, C
-    #[derive(Debug, Clone, PartialEq, Eq)]
+    use serde::{Deserialize, Serialize};
+
+    use crate::literal::Literal;
+
+    #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
     pub enum Combinator {
-        /// S combinator: Sxyz -> xz(yz)
         S,
-        /// K combinator: Kxy -> x
         K,
-        /// I combinator: Ix -> x
         I,
-        /// B combinator: Bxyz -> x(yz)
         B,
-        /// C combinator: Cxyz -> xzy
         C,
-        /// The application of two terms, such as (KS)(KI)
         App(Box<Self>, Box<Self>),
+        Primitive(Literal),
     }
 
-    // Application operator for ease of describing complex terms
     impl BitAnd for Combinator {
         type Output = Self;
-
         fn bitand(self, rhs: Self) -> Self::Output {
             Self::App(Box::new(self), Box::new(rhs))
         }
@@ -175,8 +150,51 @@ pub mod combinator {
                 Self::I => write!(f, "I"),
                 Self::B => write!(f, "B"),
                 Self::C => write!(f, "C"),
-                Self::App(lhs, rhs) if let Self::App(_, _) = **rhs => write!(f, "{lhs}({rhs})"),
-                Self::App(lhs, rhs) => write!(f, "{lhs}{rhs}"),
+                Self::App(lhs, rhs) => {
+                    if let Self::App(op_box, left) = &**lhs
+                        && let Self::Primitive(Literal::Op(op)) = &**op_box
+                    {
+                        write!(f, "({left} {op} {rhs})")
+                    } else if matches!(**rhs, Self::App(_, _)) {
+                        write!(f, "{lhs}({rhs})")
+                    } else {
+                        write!(f, "{lhs}{rhs}")
+                    }
+                }
+                Self::Primitive(p) => write!(f, "{p}"),
+            }
+        }
+    }
+
+    impl Combinator {
+        #[must_use]
+        pub fn church(n: u64) -> Self {
+            match n {
+                0 => Self::K & Self::I,
+                1 => Self::I,
+                _ => {
+                    let succ =
+                        |term: Self| (Self::S & (Self::S & (Self::K & Self::S) & Self::K)) & term;
+                    let mut curr = Self::I;
+                    for _ in 1..n {
+                        curr = succ(curr);
+                    }
+                    curr
+                }
+            }
+        }
+
+        #[must_use]
+        pub fn desugar_church(self) -> Self {
+            match self {
+                Self::Primitive(Literal::Num(n)) if n >= 0 => {
+                    u64::try_from(n).ok().map_or(self, Self::church)
+                }
+                Self::App(lhs, rhs) => Self::App(
+                    Box::new(lhs.desugar_church()),
+                    Box::new(rhs.desugar_church()),
+                ),
+                other => other,
             }
         }
     }

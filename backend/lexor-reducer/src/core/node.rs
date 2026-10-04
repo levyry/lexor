@@ -1,15 +1,15 @@
 use core::fmt;
 
+use lexor_core::Literal;
+
 slotmap::new_key_type! {
-    /// A key to access Nodes in the AST Arena
     pub struct NodeKey;
 }
 
-/// A node in the flat AST
 #[derive(Debug, Clone, Copy, PartialEq, Eq, PartialOrd, Ord, Hash)]
 pub enum Node {
     Comb(NodeComb),
-    // Graph structure
+    Prim(Literal),
     App(NodeKey, NodeKey),
     Indirection(NodeKey),
 }

@@ -1,6 +1,6 @@
 use lexor_core::de_bruijn::{DeBruijn, LambdaReductionStrategy};
 use lexor_core::lambda::Lambda;
-use lexor_parser::lambda_parser;
+use lexor_parser::parse_lambda;
 use thiserror::Error;
 
 #[derive(Debug, Error, PartialEq, Eq, PartialOrd, Ord, Hash, Clone)]
@@ -15,7 +15,7 @@ pub fn evaluate_lambda(
     input: &str,
     strat: LambdaReductionStrategy,
 ) -> Result<String, LambdaEvalError> {
-    let parsed = lambda_parser::chumsky_parse(input)
+    let parsed = parse_lambda(input)
         .map_err(|_| LambdaEvalError::ParseError(String::from("Invalid expression!")))?;
 
     let debruijn: DeBruijn = parsed.into();

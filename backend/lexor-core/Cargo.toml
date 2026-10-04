@@ -9,5 +9,4 @@ description = "Contains common, core lexor functionality"
 workspace = true
 
 [dependencies]
-lower = { workspace = true }
 serde = { workspace = true }

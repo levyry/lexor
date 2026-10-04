@@ -1,8 +1,4 @@
-/*!
-This module containts the [`EngineView`] struct, which is a view to the internal
-reduction engine that is provided by callbacks.
-*/
-
+use lexor_core::literal::Literal;
 use slotmap::Key;
 
 use crate::core::{
@@ -26,6 +22,7 @@ pub enum NodeRole {
 pub enum EngineGraphNodeKind {
     App,
     Comb(NodeComb),
+    Prim(Literal),
 }
 
 #[derive(Debug, Clone, PartialEq, Eq, PartialOrd, Ord, Hash)]
@@ -44,13 +41,12 @@ impl<'a> EngineView<'a> {
         Self(engine)
     }
 
-    /// Returns the current depth of the spine (the "stack" of the machine).
-    /// This gives an indication of how deep into the term the reducer is currently operating.
     #[must_use]
     pub const fn stack_depth(self) -> usize {
         self.0.spine.len()
     }
 
+    #[allow(clippy::missing_panics_doc)]
     pub fn traverse(&self, mut visitor: impl FnMut(&str, NodeRole, Option<NodeKey>)) {
         let spine = &self.0.spine;
         let arena = &self.0.arena;
@@ -180,12 +176,17 @@ impl<'a> EngineView<'a> {
                 };
                 visitor(x.to_string().as_str(), role, Some(current));
             }
-            Ok(Node::Indirection(_)) => unreachable!(),
+            Ok(Node::Prim(p)) => {
+                let role = state.current_role;
+                visitor(p.to_string().as_str(), role, Some(current));
+            }
+            Ok(Node::Indirection(_)) => {
+                visitor("indirection", NodeRole::Normal, Some(current));
+            }
             Err(err) => visitor(err.to_string().as_str(), NodeRole::Normal, Some(current)),
         }
     }
 
-    /// Extracts the currently reachable graph using backend types.
     #[must_use]
     pub fn extract_graph(&self) -> Vec<EngineGraphNode> {
         let mut graph = Vec::new();
@@ -213,6 +214,13 @@ impl<'a> EngineView<'a> {
                             children: vec![],
                         });
                     }
+                    Node::Prim(prim) => {
+                        graph.push(EngineGraphNode {
+                            id,
+                            kind: EngineGraphNodeKind::Prim(*prim),
+                            children: vec![],
+                        });
+                    }
                     Node::App(lhs, rhs) => {
                         let mut resolved_lhs = *lhs;
                         while let Ok(Node::Indirection(t)) = self.0.arena.get(resolved_lhs) {
@@ -236,7 +244,7 @@ impl<'a> EngineView<'a> {
                         work_stack.push(*lhs);
                         work_stack.push(*rhs);
                     }
-                    Node::Indirection(_) => unreachable!(),
+                    Node::Indirection(_) => {}
                 }
             }
         }

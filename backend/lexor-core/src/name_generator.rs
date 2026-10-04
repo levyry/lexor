@@ -17,14 +17,8 @@ impl Iterator for NameGenerator {
 
         let mut alphabet = 'a'..='z';
 
-        match alphabet.advance_by(offset) {
-            Ok(()) => (),
-            Err(_) => unreachable!(),
-        }
-
-        let letter: char = alphabet
-            .next()
-            .expect("Since offset is mod 26, we shouldn't ever hit the end of the range");
+        let _ = alphabet.advance_by(offset);
+        let letter: char = alphabet.next()?;
 
         let cycle = self.counter / 26;
 

@@ -9,6 +9,8 @@ description.workspace = true
 crate-type = ["cdylib", "rlib"]
 
 [dependencies]
+lexor-core = { workspace = true }
+lexor-parser = { workspace = true }
 lexor-reducer = { workspace = true }
 lexor-convert = { workspace = true }
 serde = { version = "1.0.228", features = ["derive"] }

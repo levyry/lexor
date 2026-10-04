@@ -136,12 +136,25 @@ export const WorksheetPanel = ({ sourceId, layout }: { sourceId: number, layout:
                             <span className="hidden @md:inline whitespace-nowrap">Settings</span>
                         </button>
                         {isSettingsOpen && (
-                            <div className="absolute top-full right-0 mt-1 bg-[#252526] border border-[#444] rounded shadow-xl z-50 py-3 px-3 min-w-[200px] flex flex-col gap-3">
+                            <div className="absolute top-full right-0 mt-1 bg-[#252526] border border-[#444] rounded shadow-xl z-50 py-3 px-3 min-w-[220px] flex flex-col gap-3">
                                 {isSki && (
-                                    <label className="flex items-center gap-2 cursor-pointer hover:text-white text-gray-300">
-                                        <input type="checkbox" checked={source.nodeSharing} onChange={e => updateSource(sourceId, { nodeSharing: e.currentTarget.checked })} />
-                                        Share Subtrees
-                                    </label>
+                                    <>
+                                        <label className="flex items-center gap-2 cursor-pointer hover:text-white text-gray-300">
+                                            <input type="checkbox" checked={source.nodeSharing} onChange={e => updateSource(sourceId, { nodeSharing: e.currentTarget.checked })} />
+                                            Share subtrees
+                                        </label>
+                                        <button
+                                            type="button"
+                                            onMouseDown={(e) => {
+                                                e.preventDefault();
+                                                useStore.getState().desugarSkiInput(sourceId);
+                                                setIsSettingsOpen(false);
+                                            }}
+                                            className="w-full text-center px-3 py-1.5 rounded bg-[#333] hover:bg-[#094771] hover:text-white text-gray-200 text-xs font-medium cursor-pointer transition-colors border border-[#444]"
+                                        >
+                                            Desugar to SKI
+                                        </button>
+                                    </>
                                 )}
                                 <div className="flex flex-col gap-1.5">
                                     <span className="text-xs text-gray-500 uppercase font-bold tracking-wider">Strategy</span>

@@ -1,5 +1,5 @@
 import { render } from 'preact';
-import { useEffect, useRef } from 'preact/hooks';
+import { useEffect, useRef, useState } from 'preact/hooks';
 import { GoldenLayout, LayoutConfig } from 'golden-layout';
 import 'golden-layout/dist/css/goldenlayout-base.css';
 import 'golden-layout/dist/css/themes/goldenlayout-dark-theme.css';
@@ -7,6 +7,7 @@ import init from './wasm/lexor_api.js';
 import { useStore } from './store';
 import { defaultLayoutConfig } from './config/layoutConfig';
 import { TopBar } from './components/TopBar';
+import { IntroModal } from './components/IntroModal';
 import { WorksheetPanel } from './panels/WorksheetPanel';
 import { AstGraphPanel } from './panels/AstGraphPanel';
 import { PathsGraphPanel } from './panels/PathsGraphPanel';
@@ -17,6 +18,7 @@ const LAYOUT_STORAGE_KEY = 'lexor-layout-storage';
 export function App() {
     const containerRef = useRef<HTMLDivElement>(null);
     const layoutRef = useRef<GoldenLayout | null>(null);
+    const [isGuideOpen, setIsGuideOpen] = useState(false);
 
     useEffect(() => { init(); }, []);
 
@@ -85,11 +87,15 @@ export function App() {
 
     return (
         <div className="flex flex-col w-screen h-screen bg-[#1e1e1e] overflow-hidden">
-            <TopBar onAddWorksheet={() => {
-                const id = useStore.getState().addSource('Ski');
-                layoutRef.current?.addComponent('Worksheet', { sourceId: id }, `Worksheet #${id}`);
-            }} />
+            <TopBar
+                onAddWorksheet={() => {
+                    const id = useStore.getState().addSource('Ski');
+                    layoutRef.current?.addComponent('Worksheet', { sourceId: id }, `Worksheet #${id}`);
+                }}
+                onOpenGuide={() => setIsGuideOpen(true)}
+            />
             <div ref={containerRef} className="flex-1 w-full relative min-h-0" />
+            <IntroModal isOpen={isGuideOpen} onClose={() => setIsGuideOpen(false)} />
         </div>
     );
 }

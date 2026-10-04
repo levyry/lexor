@@ -1,6 +1,6 @@
 import { create } from 'zustand';
 import { persist } from 'zustand/middleware';
-import { process_worker_job } from './wasm/lexor_api.js';
+import { process_worker_job, desugar_ski_church } from './wasm/lexor_api.js';
 
 export interface Source {
     id: number;
@@ -11,6 +11,7 @@ export interface Source {
     lambdaStrategy: string;
     fontSize: number;
     nodeSharing: boolean;
+    desugarChurch: boolean;
     reductionSteps: any[];
     graphHistory: any[][];
     convertedLambda: string;
@@ -29,13 +30,14 @@ interface AppState {
     updateSource: (id: number, updater: Partial<Source> | ((s: Source) => Partial<Source>)) => void;
     evaluate: (id: number) => void;
     convertSkiToLambda: (id: number) => void;
+    desugarSkiInput: (id: number) => void;
     appendLambdaComb: (id: number, combDef: string) => void;
 }
 
 const createDefaultSource = (id: number, kind: 'Ski' | 'Lambda'): Source => ({
     id, kind, skiInput: "SKISKI", lambdaInput: "\\x.\\y.\\z.y(x z)",
     skiStrategy: "NormalForm", lambdaStrategy: "NormalOrder",
-    fontSize: 20, nodeSharing: true, reductionSteps: [], graphHistory: [],
+    fontSize: 20, nodeSharing: true, desugarChurch: false, reductionSteps: [], graphHistory: [],
     convertedLambda: "", error: null
 });
 
@@ -69,6 +71,16 @@ export const useStore = create<AppState>()(persist((set, get) => ({
         const src = get().sources[id];
         if (src) get().updateSource(id, { lambdaInput: src.lambdaInput + combDef });
     },
+    desugarSkiInput: (id) => {
+        try {
+            const src = get().sources[id];
+            if (!src) return;
+            const desugared = desugar_ski_church(src.skiInput);
+            get().updateSource(id, { skiInput: desugared });
+        } catch (e) {
+            console.error('Failed to desugar Church numerals:', e);
+        }
+    },
     convertSkiToLambda: (id) => {
         try {
             const src = get().sources[id];
@@ -86,7 +98,14 @@ export const useStore = create<AppState>()(persist((set, get) => ({
             const result = JSON.parse(process_worker_job(JSON.stringify({
                 type: "Reduction", source_id: id,
                 strategy: isSki ? { Ski: src.skiStrategy } : { Lambda: src.lambdaStrategy },
-                state: isSki ? { Ski: { wants_steps: true, wants_graph: true, node_sharing: src.nodeSharing } } : { Lambda: { placeholder: false } },
+                state: isSki ? {
+                    Ski: {
+                        wants_steps: true,
+                        wants_graph: true,
+                        desugar_church: src.desugarChurch ?? false,
+                        node_sharing: src.nodeSharing
+                    }
+                } : { Lambda: { placeholder: false } },
                 input: isSki ? src.skiInput : src.lambdaInput
             })));
 

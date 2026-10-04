@@ -15,6 +15,8 @@ pub enum ReductionRequestState {
     Ski {
         wants_steps: bool,
         wants_graph: bool,
+        #[serde(default)]
+        desugar_church: bool,
     },
     Lambda {
         // TODO: remove if unneeded

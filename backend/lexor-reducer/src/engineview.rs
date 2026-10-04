@@ -106,6 +106,7 @@ impl<'a> EngineView<'a> {
         );
     }
 
+    #[allow(clippy::too_many_lines)]
     fn traverse_to_tokens_rec(
         self,
         mut state: TraverseState,
@@ -130,6 +131,54 @@ impl<'a> EngineView<'a> {
 
         match arena.get(current) {
             Ok(Node::App(lhs, rhs)) => {
+                let mut resolved_lhs = *lhs;
+                while let Ok(Node::Indirection(target)) = arena.get(resolved_lhs) {
+                    resolved_lhs = *target;
+                }
+                if let Ok(Node::App(op_key, left_key)) = arena.get(resolved_lhs) {
+                    let mut resolved_op = *op_key;
+                    while let Ok(Node::Indirection(target)) = arena.get(resolved_op) {
+                        resolved_op = *target;
+                    }
+                    if let Ok(Node::Prim(Literal::Op(op))) = arena.get(resolved_op) {
+                        let need_parens = current != self.0.root;
+                        if need_parens {
+                            visitor("(", state.current_role, Some(current));
+                        }
+                        self.traverse_to_tokens_rec(
+                            TraverseState {
+                                current_key: *left_key,
+                                current_role: state.current_role,
+                                is_rhs_of_app: false,
+                                is_redex_head: false,
+                            },
+                            redex_parent,
+                            redex_args,
+                            active_comb,
+                            visitor,
+                        );
+                        visitor(" ", state.current_role, None);
+                        visitor(op.to_string().as_str(), state.current_role, Some(resolved_op));
+                        visitor(" ", state.current_role, None);
+                        self.traverse_to_tokens_rec(
+                            TraverseState {
+                                current_key: *rhs,
+                                current_role: state.current_role,
+                                is_rhs_of_app: false,
+                                is_redex_head: false,
+                            },
+                            redex_parent,
+                            redex_args,
+                            active_comb,
+                            visitor,
+                        );
+                        if need_parens {
+                            visitor(")", state.current_role, Some(current));
+                        }
+                        return;
+                    }
+                }
+
                 if state.is_rhs_of_app {
                     visitor("(", state.current_role, Some(current));
                 }
@@ -241,8 +290,8 @@ impl<'a> EngineView<'a> {
                             children: vec![id_lhs, id_rhs],
                         });
 
-                        work_stack.push(*lhs);
                         work_stack.push(*rhs);
+                        work_stack.push(*lhs);
                     }
                     Node::Indirection(_) => {}
                 }

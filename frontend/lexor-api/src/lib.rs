@@ -4,6 +4,7 @@ use crate::{
     response::{GraphStep, ReductionResponse, ReductionResponseState, ReductionStep},
     visual::RenderToken,
 };
+use lexor_core::Literal;
 use lexor_reducer::{
     EngineGraphNodeKind::{self},
     EngineView, evaluate_lambda,
@@ -27,6 +28,7 @@ use wasm_bindgen::prelude::wasm_bindgen;
 pub enum WorkerTask {
     Reduction(ReductionRequest),
     Conversion { source_id: SourceID, input: String },
+    DesugarChurch { source_id: SourceID, input: String },
 }
 
 #[derive(Debug, Serialize, Deserialize, Clone, PartialEq, Eq, PartialOrd, Ord, Hash)]
@@ -34,13 +36,16 @@ pub enum WorkerTask {
 pub enum WorkerResult {
     Reduction(ReductionResponse),
     Conversion { source_id: SourceID, result: String },
+    DesugarChurch { source_id: SourceID, result: String },
 }
 
+#[allow(clippy::too_many_lines)]
 #[must_use]
 pub fn reduce_expression(req: &ReductionRequest) -> ReductionResponse {
     if let ReductionRequestState::Ski {
         wants_graph,
         wants_steps,
+        desugar_church,
     } = req.state
         && let ApiStrategy::Ski(strat) = req.strategy
     {
@@ -55,10 +60,19 @@ pub fn reduce_expression(req: &ReductionRequest) -> ReductionResponse {
             };
         }
 
+        let effective_input = if desugar_church {
+            lexor_parser::parse_ski(&req.input).map_or_else(
+                |_| req.input.clone(),
+                |ast| ast.desugar_church().to_string(),
+            )
+        } else {
+            req.input.clone()
+        };
+
         let mut steps: Vec<ReductionStep> = vec![];
         let mut graph: Vec<GraphStep> = vec![];
 
-        let result = strat.compute_with(&req.input, |view: EngineView| {
+        let result = strat.compute_with(&effective_input, |view: EngineView| {
             if wants_steps {
                 let mut step_tokens = vec![];
 
@@ -84,7 +98,10 @@ pub fn reduce_expression(req: &ReductionRequest) -> ReductionResponse {
                             EngineGraphNodeKind::Comb(node_comb) => {
                                 ApiGraphNodeKind::Comb(node_comb.into())
                             }
-                            EngineGraphNodeKind::Prim(lit) => ApiGraphNodeKind::Prim(lit),
+                            EngineGraphNodeKind::Prim(Literal::Num(n)) => ApiGraphNodeKind::Num(n),
+                            EngineGraphNodeKind::Prim(Literal::Op(op)) => {
+                                ApiGraphNodeKind::Op(op.to_string())
+                            }
                         };
 
                         NodeData {
@@ -152,6 +169,14 @@ pub fn reduce_expression(req: &ReductionRequest) -> ReductionResponse {
 }
 
 #[allow(clippy::missing_errors_doc)]
+#[must_use]
+#[wasm_bindgen]
+pub fn desugar_ski_church(input: &str) -> String {
+    lexor_parser::parse_ski(input)
+        .map_or_else(|_| input.to_owned(), |ast| ast.desugar_church().to_string())
+}
+
+#[allow(clippy::missing_errors_doc)]
 pub fn convert_ski_to_lambda_string(input: &str) -> Result<String, String> {
     lexor_convert::convert_ski_to_lambda(input)
 }
@@ -170,6 +195,14 @@ pub fn process_worker_job(request_json: &str) -> String {
             let result_str = convert_ski_to_lambda_string(&input).unwrap_or_else(|err| err);
 
             WorkerResult::Conversion {
+                source_id,
+                result: result_str,
+            }
+        }
+        Ok(WorkerTask::DesugarChurch { source_id, input }) => {
+            let result_str = desugar_ski_church(&input);
+
+            WorkerResult::DesugarChurch {
                 source_id,
                 result: result_str,
             }

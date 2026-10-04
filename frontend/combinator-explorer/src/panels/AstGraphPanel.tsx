@@ -40,10 +40,17 @@ export const AstGraphPanel = ({ sourceId, panelId: initialPanelId }: { sourceId:
     useEffect(() => {
         if (cyRef.current && elements.length > 0 && isReady) {
             const cy = cyRef.current;
+            cy.elements().remove();
+            cy.add(elements);
             cy.layout({
-                name: 'dagre', rankDir: 'TB', animate: false,
+                name: 'dagre',
+                rankDir: 'TB',
+                ranker: 'network-simplex',
+                nodeSep: 60,
+                edgeSep: 30,
+                rankSep: 60,
+                animate: false,
                 stop: () => {
-                    cy.nodes().forEach(n => { n.position('x', -n.position('x')); });
                     cy.fit(undefined, 50);
                     if (cy.zoom() > 1.5) { cy.zoom(1.5); cy.center(); }
                 }

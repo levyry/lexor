@@ -17,7 +17,9 @@ impl Iterator for NameGenerator {
 
         let mut alphabet = 'a'..='z';
 
-        let _ = alphabet.advance_by(offset);
+        for _ in 0..offset {
+            alphabet.next();
+        }
         let letter: char = alphabet.next()?;
 
         let cycle = self.counter / 26;

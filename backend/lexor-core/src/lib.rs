@@ -1,4 +1,3 @@
-#![feature(iter_advance_by)]
 pub mod de_bruijn;
 pub mod literal;
 mod name_generator;

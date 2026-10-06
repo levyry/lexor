@@ -71,11 +71,7 @@ impl<'a> EngineView<'a> {
                 let app_index = spine.len().saturating_sub(1).saturating_sub(i);
                 let app_key = *spine.get(app_index).expect("Because we loop based on the combinator arity, the spine should be sufficiently filled to avoid this panic.");
                 if let Ok(Node::App(_, rhs)) = arena.get(app_key) {
-                    let mut target = *rhs;
-                    while let Ok(Node::Indirection(t)) = arena.get(target) {
-                        target = *t;
-                    }
-                    redex_args.push(target);
+                    redex_args.push(*rhs);
                 }
             }
         }
@@ -116,11 +112,7 @@ impl<'a> EngineView<'a> {
         visitor: &mut dyn FnMut(&str, NodeRole, Option<NodeKey>),
     ) {
         let arena = &self.0.arena;
-        let mut current = state.current_key;
-
-        while let Ok(Node::Indirection(target)) = arena.get(current) {
-            current = *target;
-        }
+        let current = state.current_key;
 
         if state.current_role == NodeRole::Normal
             && let Some(arg_idx) = redex_args.iter().position(|&k| k == current)
@@ -131,52 +123,50 @@ impl<'a> EngineView<'a> {
 
         match arena.get(current) {
             Ok(Node::App(lhs, rhs)) => {
-                let mut resolved_lhs = *lhs;
-                while let Ok(Node::Indirection(target)) = arena.get(resolved_lhs) {
-                    resolved_lhs = *target;
-                }
-                if let Ok(Node::App(op_key, left_key)) = arena.get(resolved_lhs) {
-                    let mut resolved_op = *op_key;
-                    while let Ok(Node::Indirection(target)) = arena.get(resolved_op) {
-                        resolved_op = *target;
+                if let Ok(Node::App(op_key, left_key)) = arena.get(*lhs)
+                    && let Ok(Node::Prim(Literal::Op(op))) = arena.get(*op_key)
+                {
+                    let need_parens = current != self.0.root;
+                    if need_parens {
+                        visitor("(", state.current_role, Some(current));
                     }
-                    if let Ok(Node::Prim(Literal::Op(op))) = arena.get(resolved_op) {
-                        let need_parens = current != self.0.root;
-                        if need_parens {
-                            visitor("(", state.current_role, Some(current));
-                        }
-                        self.traverse_to_tokens_rec(
-                            TraverseState {
-                                current_key: *left_key,
-                                current_role: state.current_role,
-                                is_rhs_of_app: false,
-                                is_redex_head: false,
-                            },
-                            redex_parent,
-                            redex_args,
-                            active_comb,
-                            visitor,
-                        );
-                        visitor(" ", state.current_role, None);
-                        visitor(op.to_string().as_str(), state.current_role, Some(resolved_op));
-                        visitor(" ", state.current_role, None);
-                        self.traverse_to_tokens_rec(
-                            TraverseState {
-                                current_key: *rhs,
-                                current_role: state.current_role,
-                                is_rhs_of_app: false,
-                                is_redex_head: false,
-                            },
-                            redex_parent,
-                            redex_args,
-                            active_comb,
-                            visitor,
-                        );
-                        if need_parens {
-                            visitor(")", state.current_role, Some(current));
-                        }
-                        return;
+
+                    self.traverse_to_tokens_rec(
+                        TraverseState {
+                            current_key: *left_key,
+                            current_role: state.current_role,
+                            is_rhs_of_app: false,
+                            is_redex_head: false,
+                        },
+                        redex_parent,
+                        redex_args,
+                        active_comb,
+                        visitor,
+                    );
+
+                    visitor(" ", state.current_role, None);
+
+                    visitor(op.to_string().as_str(), state.current_role, Some(*op_key));
+
+                    visitor(" ", state.current_role, None);
+
+                    self.traverse_to_tokens_rec(
+                        TraverseState {
+                            current_key: *rhs,
+                            current_role: state.current_role,
+                            is_rhs_of_app: false,
+                            is_redex_head: false,
+                        },
+                        redex_parent,
+                        redex_args,
+                        active_comb,
+                        visitor,
+                    );
+
+                    if need_parens {
+                        visitor(")", state.current_role, Some(current));
                     }
+                    return;
                 }
 
                 if state.is_rhs_of_app {
@@ -229,10 +219,8 @@ impl<'a> EngineView<'a> {
                 let role = state.current_role;
                 visitor(p.to_string().as_str(), role, Some(current));
             }
-            Ok(Node::Indirection(_)) => {
-                visitor("indirection", NodeRole::Normal, Some(current));
-            }
             Err(err) => visitor(err.to_string().as_str(), NodeRole::Normal, Some(current)),
+            Ok(Node::Indirection(_)) => unreachable!("arena.get() hides indirections"),
         }
     }
 
@@ -243,10 +231,7 @@ impl<'a> EngineView<'a> {
         let mut work_stack = vec![self.0.root];
 
         while let Some(current) = work_stack.pop() {
-            let mut resolved_key = current;
-            while let Ok(Node::Indirection(target)) = self.0.arena.get(resolved_key) {
-                resolved_key = *target;
-            }
+            let resolved_key = current;
 
             if !visited.insert(resolved_key) {
                 continue;
@@ -271,18 +256,8 @@ impl<'a> EngineView<'a> {
                         });
                     }
                     Node::App(lhs, rhs) => {
-                        let mut resolved_lhs = *lhs;
-                        while let Ok(Node::Indirection(t)) = self.0.arena.get(resolved_lhs) {
-                            resolved_lhs = *t;
-                        }
-
-                        let mut resolved_rhs = *rhs;
-                        while let Ok(Node::Indirection(t)) = self.0.arena.get(resolved_rhs) {
-                            resolved_rhs = *t;
-                        }
-
-                        let id_lhs = resolved_lhs.data().as_ffi();
-                        let id_rhs = resolved_rhs.data().as_ffi();
+                        let id_lhs = lhs.data().as_ffi();
+                        let id_rhs = rhs.data().as_ffi();
 
                         graph.push(EngineGraphNode {
                             id,
@@ -293,7 +268,7 @@ impl<'a> EngineView<'a> {
                         work_stack.push(*rhs);
                         work_stack.push(*lhs);
                     }
-                    Node::Indirection(_) => {}
+                    Node::Indirection(_) => unreachable!("arena.get() hides indirections"),
                 }
             }
         }

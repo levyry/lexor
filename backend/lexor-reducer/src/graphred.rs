@@ -83,10 +83,7 @@ impl ReductionStrategy {
                                 let sp_len = engine.spine.len();
                                 let inner_key = engine.spine.get(sp_len.saturating_sub(2)).copied();
                                 let outer_key = engine.spine.get(sp_len.saturating_sub(3)).copied();
-                                let is_num = |mut k| {
-                                    while let Ok(Node::Indirection(t)) = engine.arena.get(k) {
-                                        k = *t;
-                                    }
+                                let is_num = |k| {
                                     matches!(engine.arena.get(k), Ok(Node::Prim(Literal::Num(_))))
                                 };
                                 let arg0_ok = inner_key.and_then(|k| engine.arena.get_arg(k).ok()).is_some_and(is_num);

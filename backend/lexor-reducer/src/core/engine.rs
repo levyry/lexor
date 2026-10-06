@@ -55,24 +55,7 @@ impl Engine {
         }
     }
 
-    fn resolve_indirection(&mut self, origin: NodeKey) -> NodeKey {
-        let mut current = origin;
 
-        while let Ok(&Node::Indirection(target)) = self.arena.get(current) {
-            // Path compression
-            if let Some(&parent_key) = self.spine.last()
-                && let Ok(Node::App(_, r)) = self.arena.get(parent_key)
-            {
-                self.arena.replace(parent_key, Node::App(target, *r));
-            } else {
-                // Empty spine, parent is root
-                self.subtree_root = target;
-            }
-            current = target;
-        }
-
-        current
-    }
 
     pub(crate) fn unwind(&mut self, current: NodeKey) -> Result<()> {
         let mut current = current;
@@ -88,11 +71,7 @@ impl Engine {
                     self.spine.push(current);
                     break;
                 }
-
-                Ok(Node::Indirection(_)) => {
-                    current = self.resolve_indirection(current);
-                }
-
+                Ok(Node::Indirection(_)) => unreachable!("arena.get() hides indirections"),
                 Err(err) => {
                     return Err(EngineError::MissingKey(err));
                 }
@@ -181,16 +160,10 @@ impl Engine {
                 let app0_index = spine_len.saturating_sub(2);
                 let app1_key = self.spine[app1_index];
                 let app0_key = self.spine[app0_index];
-                let mut arg0_key = self.arena.get_arg(app1_key)?;
-                let mut arg1_key = self.arena.get_arg(app0_key)?;
+                let arg0_key = self.arena.get_arg(app1_key)?;
+                let arg1_key = self.arena.get_arg(app0_key)?;
 
-                while let Ok(Node::Indirection(target)) = self.arena.get(arg0_key) {
-                    arg0_key = *target;
-                }
 
-                while let Ok(Node::Indirection(target)) = self.arena.get(arg1_key) {
-                    arg1_key = *target;
-                }
 
                 let num0 = match self.arena.get(arg0_key) {
                     Ok(Node::Prim(Literal::Num(n))) => Some(*n),

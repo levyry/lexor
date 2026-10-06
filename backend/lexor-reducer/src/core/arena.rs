@@ -30,10 +30,10 @@ impl Arena {
     }
 
     pub(crate) fn get_arg(&self, key: NodeKey) -> Result<NodeKey> {
-        match self.0.get(key) {
-            Some(Node::App(_, arg)) => Ok(*arg),
-            Some(_) => Err(ArenaError::MissingArg),
-            None => Err(ArenaError::MissingKey),
+        match self.get(key) {
+            Ok(Node::App(_, arg)) => Ok(*arg),
+            Ok(_) => Err(ArenaError::MissingArg),
+            Err(e) => Err(e),
         }
     }
 
@@ -53,8 +53,19 @@ impl Arena {
         }
     }
 
-    pub(crate) fn get(&self, key: NodeKey) -> Result<&Node> {
+    pub(crate) fn get_raw(&self, key: NodeKey) -> Result<&Node> {
         self.0.get(key).ok_or(ArenaError::MissingKey)
+    }
+
+    pub(crate) fn resolve(&self, mut key: NodeKey) -> NodeKey {
+        while let Ok(Node::Indirection(target)) = self.get_raw(key) {
+            key = *target;
+        }
+        key
+    }
+
+    pub(crate) fn get(&self, key: NodeKey) -> Result<&Node> {
+        self.get_raw(self.resolve(key))
     }
 
     pub(crate) fn insert(&mut self, value: Node) -> NodeKey {

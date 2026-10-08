@@ -1,7 +1,70 @@
 import { useEffect, useState } from 'preact/hooks';
-import { GoldenLayout } from 'golden-layout';
+import { ComponentContainer, GoldenLayout } from 'golden-layout';
 import { useStore } from '../store';
-import { getRedexColors } from '../graphUtils';
+import { getRedexColors, groupStepTokens } from '../graphUtils';
+import { openPanelRight } from '../utils/layoutUtils';
+import { Codicon } from '../components/Codicon';
+
+export const RenderStepTokens = ({ stepTokens, onTokenHover, onTokenClick, isHoverable, activeTargetId, headRef }: { stepTokens: any[], onTokenHover?: (edgeId: number | null) => void, onTokenClick?: (edgeId: number | null) => void, isHoverable?: boolean, activeTargetId?: number | null, headRef?: any }) => {
+    const chunks = groupStepTokens(stepTokens);
+
+    return <>{chunks.map((c) => {
+        const text = c.tokens.map((t: any) => t.text).join('');
+        let bg = "transparent", color = "#cccccc", border = "transparent", px = "0";
+        if (typeof c.style === 'object') {
+            const isHead = 'RedexHead' in c.style;
+            const colors = getRedexColors(isHead ? c.style.RedexHead : c.style.RedexBody[0]);
+            bg = isHead ? colors.head : colors.body;
+            color = isHead ? 'white' : '#cccccc';
+            border = colors.border;
+            px = "4px";
+        }
+        const isHead = typeof c.style === 'object' && 'RedexHead' in c.style;
+        const edgeId = c.tokens[0]?.edgeId;
+        const isTargetHead = isHead && activeTargetId !== undefined && activeTargetId !== null && edgeId === activeTargetId;
+
+        const handleMouseEnter = () => {
+            if (!isHoverable || !onTokenHover) return;
+            if (edgeId !== undefined && edgeId !== null) {
+                onTokenHover(edgeId);
+            } else {
+                onTokenHover(null);
+            }
+        };
+
+        return <span
+            key={c.startIndex}
+            ref={isTargetHead ? headRef : null}
+            data-edge-id={isHead && edgeId !== undefined && edgeId !== null ? edgeId : undefined}
+            data-active-head={isTargetHead ? "true" : undefined}
+            style={{
+                position: 'relative',
+                display: 'inline-block',
+                backgroundColor: bg,
+                color,
+                border: `1px solid ${border}`,
+                padding: `0 ${px}`,
+                borderRadius: '2px',
+                cursor: isHoverable && (typeof c.style === 'object' || (edgeId !== undefined && edgeId !== null)) ? 'pointer' : 'default',
+                transition: 'background-color 0.1s ease, color 0.1s ease, border-color 0.1s ease'
+            }}
+            onMouseEnter={handleMouseEnter}
+            onClick={isHoverable && onTokenClick && edgeId !== undefined && edgeId !== null ? () => onTokenClick(edgeId) : undefined}
+        >
+            {isHoverable && typeof c.style === 'object' && (
+                <span style={{
+                    position: 'absolute',
+                    top: '-6px', bottom: '-6px',
+                    left: '0px',
+                    right: '0px',
+                    zIndex: 10,
+                    pointerEvents: 'none'
+                }} />
+            )}
+            {text}
+        </span>;
+    })}</>;
+};
 
 const LAMBDA_DEFS = [
     { comb: "S", def: "a -> b -> c -> a c(b c)", val: "(\\x.\\y.\\z.x z(y z))" },
@@ -15,7 +78,7 @@ const FONT_SIZES = [10, 11, 12, 13, 14, 15, 16, 17, 18, 19, 20, 21, 22, 23, 24, 
 const btnBase = "bg-[#333] hover:bg-[#444] border border-[#555] h-[30px] rounded text-white outline-none focus:border-blue-500 transition-colors cursor-pointer flex items-center justify-center shrink-0";
 const selectBase = "bg-[#2d2d2d] border border-[#444] px-2 h-[30px] rounded text-white outline-none cursor-pointer shrink-0";
 
-export const WorksheetPanel = ({ sourceId, layout }: { sourceId: number, layout: GoldenLayout }) => {
+export const WorksheetPanel = ({ sourceId, layout, container }: { sourceId: number, layout: GoldenLayout, container?: ComponentContainer }) => {
     const source = useStore(state => state.sources[sourceId]);
     const updateSource = useStore(state => state.updateSource);
     const evaluate = useStore(state => state.evaluate);
@@ -41,34 +104,12 @@ export const WorksheetPanel = ({ sourceId, layout }: { sourceId: number, layout:
     const isSki = source.kind === 'Ski';
 
     const handleAddView = (val: string) => {
-        const titles: Record<string, string> = { AstGraph: 'AST Graph', PathsGraph: 'Reduction Paths', Converter: 'Conversion' };
-        layout.addComponent(val, { sourceId, panelId: Math.random().toString(36).slice(2) }, `${titles[val]} (Worksheet #${sourceId})`);
+        const titles: Record<string, string> = { AstGraph: 'AST Graph', PathsGraph: 'State Space Graph', Converter: 'Conversion' };
+        openPanelRight(layout, val, { sourceId, panelId: Math.random().toString(36).slice(2) }, `${titles[val]} (Worksheet #${sourceId})`, container);
         setIsAddMenuOpen(false);
     };
 
-    const renderStepTokens = (stepTokens: any[]) => {
-        const chunks: any[] = [];
-        stepTokens.forEach(t => {
-            const key = typeof t.style === 'object' ? ('RedexHead' in t.style ? `H-${t.style.RedexHead}` : `B-${JSON.stringify(t.style.RedexBody)}`) : 'Normal';
-            const last = chunks[chunks.length - 1];
-            if (last && last.key === key) last.tokens.push(t);
-            else chunks.push({ key, style: t.style, tokens: [t] });
-        });
-
-        return chunks.map((c, i) => {
-            const text = c.tokens.map((t: any) => t.text).join('');
-            let bg = "transparent", color = "#cccccc", border = "transparent", px = "0";
-            if (typeof c.style === 'object') {
-                const isHead = 'RedexHead' in c.style;
-                const colors = getRedexColors(isHead ? c.style.RedexHead : c.style.RedexBody[0]);
-                bg = isHead ? colors.head : colors.body;
-                color = isHead ? 'white' : '#cccccc';
-                border = colors.border;
-                px = "4px";
-            }
-            return <span key={i} style={{ backgroundColor: bg, color, border: `1px solid ${border}`, padding: `0 ${px}`, borderRadius: '2px' }}>{text}</span>;
-        });
-    };
+    const renderStepTokens = (stepTokens: any[]) => <RenderStepTokens stepTokens={stepTokens} />;
 
     const handleMenuBlur = (e: any, closeFn: () => void) => {
         if (!e.currentTarget.contains(e.relatedTarget as Node)) closeFn();
@@ -83,8 +124,8 @@ export const WorksheetPanel = ({ sourceId, layout }: { sourceId: number, layout:
 
                     {/* Font size */}
                     <div className="relative" onBlur={e => handleMenuBlur(e, () => setIsFontMenuOpen(false))}>
-                        <button onClick={() => setIsFontMenuOpen(!isFontMenuOpen)} className={`${btnBase} px-3 font-serif italic`} title="Change Font Size">
-                            <span className="font-bold text-lg">A</span><span className="text-sm leading-none">a</span>
+                        <button onClick={() => setIsFontMenuOpen(!isFontMenuOpen)} className={`${btnBase} px-3 flex items-center justify-center`} title="Change Font Size">
+                            <Codicon name="text-size" className="text-gray-400 shrink-0" />
                         </button>
                         {isFontMenuOpen && (
                             <div className="absolute top-full left-0 mt-1 bg-[#252526] border border-[#444] rounded shadow-xl z-50 py-1 min-w-[70px]">
@@ -109,15 +150,15 @@ export const WorksheetPanel = ({ sourceId, layout }: { sourceId: number, layout:
                     {/* Add new... */}
                     <div className="relative" onBlur={e => handleMenuBlur(e, () => setIsAddMenuOpen(false))}>
                         <button onClick={() => setIsAddMenuOpen(!isAddMenuOpen)} className={`${btnBase} px-3 flex items-center gap-1.5`} title="Add a new pane">
-                            <svg className="w-4 h-4 text-gray-400 shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 4v16m8-8H4" /></svg>
+                            <Codicon name="add" className="text-gray-400 shrink-0" />
                             <span className="hidden @md:inline whitespace-nowrap">Add new...</span>
                         </button>
                         {isAddMenuOpen && (
                             <div className="absolute top-full left-0 mt-1 bg-[#252526] border border-[#444] rounded shadow-xl z-50 py-1 min-w-[150px] whitespace-nowrap">
                                 {isSki ? (
                                     <>
-                                        <div className="px-3 py-1.5 hover:bg-[#094771] hover:text-white cursor-pointer text-gray-300" onMouseDown={(e) => { e.preventDefault(); handleAddView('AstGraph'); }}>AST graph</div>
-                                        <div className="px-3 py-1.5 hover:bg-[#094771] hover:text-white cursor-pointer text-gray-300" onMouseDown={(e) => { e.preventDefault(); handleAddView('PathsGraph'); }}>State space graph</div>
+                                        <div className="px-3 py-1.5 hover:bg-[#094771] hover:text-white cursor-pointer text-gray-300" onMouseDown={(e) => { e.preventDefault(); handleAddView('AstGraph'); }}>AST Graph</div>
+                                        <div className="px-3 py-1.5 hover:bg-[#094771] hover:text-white cursor-pointer text-gray-300" onMouseDown={(e) => { e.preventDefault(); handleAddView('PathsGraph'); }}>State Space Graph</div>
                                         <div className="px-3 py-1.5 hover:bg-[#094771] hover:text-white cursor-pointer text-gray-300" onMouseDown={(e) => { e.preventDefault(); handleAddView('Converter'); }}>Conversion</div>
                                     </>
                                 ) : (
@@ -132,7 +173,7 @@ export const WorksheetPanel = ({ sourceId, layout }: { sourceId: number, layout:
                     {/* Settings dropdown */}
                     <div className="relative" onBlur={e => handleMenuBlur(e, () => setIsSettingsOpen(false))}>
                         <button onClick={() => setIsSettingsOpen(!isSettingsOpen)} className={`${btnBase} px-3 flex items-center gap-1.5`} title="Configuration">
-                            <svg className="w-4 h-4 text-gray-400 shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M10.325 4.317c.426-1.756 2.924-1.756 3.35 0a1.724 1.724 0 002.573 1.066c1.543-.94 3.31.826 2.37 2.37a1.724 1.724 0 001.065 2.572c1.756.426 1.756 2.924 0 3.35a1.724 1.724 0 00-1.066 2.573c.94 1.543-.826 3.31-2.37 2.37a1.724 1.724 0 00-2.572 1.065c-.426 1.756-2.924 1.756-3.35 0a1.724 1.724 0 00-2.573-1.066c-1.543.94-3.31-.826-2.37-2.37a1.724 1.724 0 00-1.065-2.572c-1.756-.426-1.756-2.924 0-3.35a1.724 1.724 0 001.066-2.573c-.94-1.543.826-3.31 2.37-2.37.996.608 2.296.07 2.572-1.065z" /><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 12a3 3 0 11-6 0 3 3 0 016 0z" /></svg>
+                            <Codicon name="settings-gear" className="text-gray-400 shrink-0" />
                             <span className="hidden @md:inline whitespace-nowrap">Settings</span>
                         </button>
                         {isSettingsOpen && (
@@ -168,8 +209,8 @@ export const WorksheetPanel = ({ sourceId, layout }: { sourceId: number, layout:
 
                     {/* Language selector */}
                     <select value={source.kind} onChange={e => updateSource(sourceId, { kind: e.currentTarget.value as any })} className={`${selectBase} font-bold text-center px-1`}>
-                        <option value="Ski">SKI</option>
-                        <option value="Lambda">λ</option>
+                        <option value="Ski">SKI-calculus</option>
+                        <option value="Lambda">λ-calculus</option>
                     </select>
                 </div>
 

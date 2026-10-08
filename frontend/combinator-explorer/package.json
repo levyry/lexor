@@ -7,6 +7,7 @@
 		"preview": "vite preview"
 	},
 	"dependencies": {
+		"@vscode/codicons": "^0.0.46-24",
 		"cytoscape": "^3.34.3",
 		"cytoscape-dagre": "^4.0.1",
 		"golden-layout": "^2.6.0",

@@ -22,3 +22,23 @@ pub enum ReductionResponseState {
         output: Option<String>,
     },
 }
+
+#[derive(Debug, Clone, Serialize, Deserialize, PartialEq, Eq, PartialOrd, Ord, Hash)]
+pub struct ApiStateNode {
+    pub id: usize,
+    pub expression: String,
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize, PartialEq, Eq, PartialOrd, Ord, Hash)]
+pub struct ApiStateEdge {
+    pub from: usize,
+    pub to: usize,
+    pub is_normal_order: bool,
+    pub transition_tokens: Vec<RenderToken>,
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize, PartialEq, Eq, PartialOrd, Ord, Hash)]
+pub struct ApiStateSpace {
+    pub nodes: Vec<ApiStateNode>,
+    pub edges: Vec<ApiStateEdge>,
+}

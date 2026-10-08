@@ -29,6 +29,24 @@ export const getRedexColors = (label: string) => {
     return { head: '#3c3c3c', body: '#2d2d2d', border: '#555555' };
 };
 
+export const groupStepTokens = (stepTokens: any[]) => {
+    const chunks: any[] = [];
+    let currentIndex = 0;
+    stepTokens.forEach(t => {
+        const key = typeof t.style === 'object' 
+            ? ('RedexHead' in t.style ? `H-${t.style.RedexHead}-${t.edgeId ?? ''}` : `B-${JSON.stringify(t.style.RedexBody)}`) 
+            : (t.edgeId ? `Normal-${t.edgeId}` : 'Normal');
+        const last = chunks[chunks.length - 1];
+        if (last && last.key === key) {
+            last.tokens.push(t);
+        } else {
+            chunks.push({ key, style: t.style, tokens: [t], startIndex: currentIndex });
+        }
+        currentIndex += (t.text?.length || 1);
+    });
+    return chunks;
+};
+
 export const buildCytoscapeElements = (apiNodes: any[]) => apiNodes.flatMap(node => {
     const isApp = node.kind === 'App';
     let label = '@';

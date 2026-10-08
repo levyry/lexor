@@ -12,6 +12,7 @@ import { WorksheetPanel } from './panels/WorksheetPanel';
 import { AstGraphPanel } from './panels/AstGraphPanel';
 import { PathsGraphPanel } from './panels/PathsGraphPanel';
 import { ConverterPanel } from './panels/ConverterPanel';
+import { openPanelRight } from './utils/layoutUtils';
 
 const LAYOUT_STORAGE_KEY = 'lexor-layout-storage';
 
@@ -28,7 +29,7 @@ export function App() {
 
         layout.registerComponentFactoryFunction('Worksheet', (container) => {
             const sourceId = (container.initialState as any)?.sourceId ?? 1;
-            render(<WorksheetPanel sourceId={sourceId} layout={layout} />, container.element);
+            render(<WorksheetPanel sourceId={sourceId} layout={layout} container={container} />, container.element);
             container.on('destroy', () => {
                 render(null, container.element);
                 useStore.getState().removeSource(sourceId);
@@ -90,12 +91,14 @@ export function App() {
             <TopBar
                 onAddWorksheet={() => {
                     const id = useStore.getState().addSource('Ski');
-                    layoutRef.current?.addComponent('Worksheet', { sourceId: id }, `Worksheet #${id}`);
+                    if (layoutRef.current) {
+                        openPanelRight(layoutRef.current, 'Worksheet', { sourceId: id }, `Worksheet #${id}`);
+                    }
                 }}
                 onOpenGuide={() => setIsGuideOpen(true)}
             />
             <div ref={containerRef} className="flex-1 w-full relative min-h-0" />
-            <IntroModal isOpen={isGuideOpen} onClose={() => setIsGuideOpen(false)} />
+            <IntroModal isOpen={isGuideOpen} onClose={() => setIsGuideOpen(false)} layoutRef={layoutRef} />
         </div>
     );
 }

@@ -1,16 +1,15 @@
 import { useEffect } from 'preact/hooks';
 import { useStore } from '../store';
+import { createPresetLayout } from '../config/layoutConfig';
 
 interface IntroModalProps {
     isOpen: boolean;
     onClose: () => void;
+    layoutRef: any;
 }
 
 const EXAMPLES = [
-    {
-        expr: 'S K K',
-        desc: 'Identity combinator using S and K',
-    },
+
     {
         expr: '(6 * 7) + (20 - 5)',
         desc: 'Basic arithmetic: 42 + 15 = 57',
@@ -18,6 +17,11 @@ const EXAMPLES = [
     {
         expr: 'K (10 + 20) (99 * 99)',
         desc: 'K combinator discarding second argument',
+    },
+    {
+        expr: 'SKIS(KSSKSI)KSKI',
+        desc: 'Explore the state space graph for expressions with multiple possible redexes',
+        generateStateSpace: true,
     },
     {
         expr: '(S(S(KS)K)(S(S(KS)K)(S(S(KS)K)I)))(S(S(KS)K)I)',
@@ -29,7 +33,7 @@ const EXAMPLES = [
     },
 ];
 
-export const IntroModal = ({ isOpen, onClose }: IntroModalProps) => {
+export const IntroModal = ({ isOpen, onClose, layoutRef }: IntroModalProps) => {
     useEffect(() => {
         const handleKeyDown = (e: KeyboardEvent) => {
             if (e.key === 'Escape') onClose();
@@ -42,14 +46,27 @@ export const IntroModal = ({ isOpen, onClose }: IntroModalProps) => {
 
     if (!isOpen) return null;
 
-    const handleLoadExample = (expr: string) => {
-        const sources = useStore.getState().sources;
-        const firstId = Object.keys(sources).map(Number)[0] ?? useStore.getState().addSource('Ski');
-        useStore.getState().updateSource(firstId, {
+    const handleLoadExample = async (example: typeof EXAMPLES[0]) => {
+        const layout = layoutRef.current;
+        if (!layout) return;
+
+        const newSourceId = useStore.getState().addSource('Ski');
+
+        useStore.getState().updateSource(newSourceId, {
             kind: 'Ski',
-            skiInput: expr,
+            skiInput: example.expr,
         });
-        useStore.getState().evaluate(firstId);
+        await useStore.getState().evaluate(newSourceId);
+
+        let needsPathGraph = 'generateStateSpace' in example && example.generateStateSpace;
+        if (needsPathGraph) {
+            await useStore.getState().generateStateSpace(newSourceId);
+        }
+
+        const presetLayout = createPresetLayout(newSourceId, needsPathGraph);
+
+        layout.loadLayout(presetLayout);
+
         onClose();
     };
 
@@ -106,7 +123,7 @@ export const IntroModal = ({ isOpen, onClose }: IntroModalProps) => {
                             {EXAMPLES.map((ex, idx) => (
                                 <div key={idx} className="flex items-center gap-3 bg-[#1e1e1e] p-2 border border-[#333]">
                                     <button
-                                        onClick={() => handleLoadExample(ex.expr)}
+                                        onClick={() => handleLoadExample(ex)}
                                         className="bg-[#333] hover:bg-[#444] border border-[#555] px-2 py-0.5 text-white cursor-pointer shrink-0"
                                     >
                                         Load

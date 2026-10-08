@@ -29,14 +29,25 @@ pub enum WorkerTask {
     Reduction(ReductionRequest),
     Conversion { source_id: SourceID, input: String },
     DesugarChurch { source_id: SourceID, input: String },
+    StateSpace { source_id: SourceID, input: String },
 }
 
 #[derive(Debug, Serialize, Deserialize, Clone, PartialEq, Eq, PartialOrd, Ord, Hash)]
 #[serde(tag = "type")]
 pub enum WorkerResult {
     Reduction(ReductionResponse),
-    Conversion { source_id: SourceID, result: String },
-    DesugarChurch { source_id: SourceID, result: String },
+    Conversion {
+        source_id: SourceID,
+        result: String,
+    },
+    DesugarChurch {
+        source_id: SourceID,
+        result: String,
+    },
+    StateSpace {
+        source_id: SourceID,
+        result: Result<response::ApiStateSpace, String>,
+    },
 }
 
 #[allow(clippy::too_many_lines)]
@@ -206,6 +217,31 @@ pub fn process_worker_job(request_json: &str) -> String {
                 source_id,
                 result: result_str,
             }
+        }
+        Ok(WorkerTask::StateSpace { source_id, input }) => {
+            let result = lexor_reducer::generate_state_space(&input)
+                .map_err(|e| e.to_string())
+                .map(|space| {
+                    use crate::response::{ApiStateSpace, ApiStateNode, ApiStateEdge};
+                    ApiStateSpace {
+                        nodes: space.nodes.into_iter().map(|n| ApiStateNode {
+                            id: n.id,
+                            expression: n.expression,
+                        }).collect(),
+                        edges: space.edges.into_iter().map(|e| ApiStateEdge {
+                            from: e.from,
+                            to: e.to,
+                            is_normal_order: e.is_normal_order,
+                            transition_tokens: e.transition_tokens.into_iter().map(|t| RenderToken {
+                                text: t.text,
+                                style: t.role.into(),
+                                node_key: t.key,
+                            }).collect(),
+                        }).collect(),
+                    }
+                });
+
+            WorkerResult::StateSpace { source_id, result }
         }
         Err(e) => {
             return format!(r#"{{"error": "Failed to parse worker task: {e}"}}"#);

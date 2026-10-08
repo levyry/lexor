@@ -22,3 +22,33 @@ export const defaultLayoutConfig: LayoutConfig = {
         ]
     }
 };
+
+export const createPresetLayout = (sourceId: number, includePathsGraph: boolean): LayoutConfig => {
+    const content: any[] = [
+        {
+            type: 'component',
+            componentType: 'Worksheet',
+            title: `Worksheet #${sourceId}`,
+            componentState: { sourceId }
+        }
+    ];
+
+    if (includePathsGraph) {
+        content.push({
+            type: 'component',
+            componentType: 'PathsGraph',
+            title: `State Space Graph (Worksheet #${sourceId})`,
+            componentState: { sourceId, panelId: Math.random().toString(36).slice(2) }
+        });
+    }
+
+    return {
+        header: {
+            popout: false,
+        },
+        root: {
+            type: 'row',
+            content
+        }
+    };
+};

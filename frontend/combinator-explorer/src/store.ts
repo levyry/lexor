@@ -15,6 +15,8 @@ export interface Source {
     reductionSteps: any[];
     graphHistory: any[][];
     convertedLambda: string;
+    stateSpace: any | null;
+    selectedNodeId: number;
     error: string | null;
 }
 
@@ -32,13 +34,14 @@ interface AppState {
     convertSkiToLambda: (id: number) => void;
     desugarSkiInput: (id: number) => void;
     appendLambdaComb: (id: number, combDef: string) => void;
+    generateStateSpace: (id: number) => void;
 }
 
 const createDefaultSource = (id: number, kind: 'Ski' | 'Lambda'): Source => ({
     id, kind, skiInput: "SKISKI", lambdaInput: "\\x.\\y.\\z.y(x z)",
     skiStrategy: "NormalForm", lambdaStrategy: "NormalOrder",
     fontSize: 20, nodeSharing: true, desugarChurch: false, reductionSteps: [], graphHistory: [],
-    convertedLambda: "", error: null
+    convertedLambda: "", stateSpace: null, error: null, selectedNodeId: 0
 });
 
 export const useStore = create<AppState>()(persist((set, get) => ({
@@ -120,6 +123,21 @@ export const useStore = create<AppState>()(persist((set, get) => ({
                 reductionSteps: [[{ text: result.state.Lambda.output, style: "Normal" }]],
                 graphHistory: []
             });
+        } catch (e) { get().updateSource(id, { error: String(e) }); }
+    },
+    generateStateSpace: (id) => {
+        const src = get().sources[id];
+        if (!src || src.kind !== 'Ski') return;
+        try {
+            const result = JSON.parse(process_worker_job(JSON.stringify({
+                type: "StateSpace", source_id: id, input: src.skiInput
+            })));
+            if (result.error) throw new Error(result.error);
+            if (result.result?.Ok) {
+                get().updateSource(id, { stateSpace: result.result.Ok, error: null, selectedNodeId: 0 });
+            } else if (result.result?.Err) {
+                throw new Error(result.result.Err);
+            }
         } catch (e) { get().updateSource(id, { error: String(e) }); }
     }
 }), { name: 'lexor-state-storage' }));

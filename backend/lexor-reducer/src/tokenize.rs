@@ -8,7 +8,7 @@ use crate::core::{
 
 pub type ArgIndex = usize;
 
-#[derive(Debug, Clone, PartialEq, Eq)]
+#[derive(Debug, Clone, PartialEq, Eq, PartialOrd, Ord, Hash)]
 pub struct EngineToken {
     pub text: String,
     pub role: NodeRole,

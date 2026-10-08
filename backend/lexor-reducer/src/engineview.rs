@@ -3,20 +3,14 @@ use slotmap::Key;
 
 use crate::core::{
     engine::Engine,
-    node::{Node, NodeComb, NodeKey},
+    node::{Node, NodeComb},
+    visitor::Visitor,
 };
 
 use core::fmt::{self, Display};
 use std::collections::HashSet;
 
-pub type ArgIndex = usize;
-
-#[derive(Debug, Clone, Copy, PartialEq, Eq, PartialOrd, Ord, Hash)]
-pub enum NodeRole {
-    Normal,
-    RedexHead(NodeComb),
-    RedexArg(NodeComb, ArgIndex),
-}
+use crate::tokenize::{EngineToken, NodeRole, TokenizeVisitor, TraverseState};
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq, PartialOrd, Ord, Hash)]
 pub enum EngineGraphNodeKind {
@@ -44,184 +38,6 @@ impl<'a> EngineView<'a> {
     #[must_use]
     pub const fn stack_depth(self) -> usize {
         self.0.spine.len()
-    }
-
-    #[allow(clippy::missing_panics_doc)]
-    pub fn traverse(&self, mut visitor: impl FnMut(&str, NodeRole, Option<NodeKey>)) {
-        let spine = &self.0.spine;
-        let arena = &self.0.arena;
-
-        let mut redex_parent = None;
-        let mut redex_args = Vec::new();
-        let mut active_comb = None;
-
-        if let Some(&head_key) = spine.last()
-            && let Ok(Node::Comb(comb)) = arena.get(head_key)
-            && spine.len() > comb.arity()
-        {
-            let parent_index = spine.len().saturating_sub(2);
-            redex_parent = Some(
-                *spine
-                    .get(parent_index)
-                    .expect("If conditions should guard against a panic here."),
-            );
-            active_comb = Some(*comb);
-
-            for i in 1..=comb.arity() {
-                let app_index = spine.len().saturating_sub(1).saturating_sub(i);
-                let app_key = *spine.get(app_index).expect("Because we loop based on the combinator arity, the spine should be sufficiently filled to avoid this panic.");
-                if let Ok(Node::App(_, rhs)) = arena.get(app_key) {
-                    redex_args.push(*rhs);
-                }
-            }
-        }
-
-        self.traverse_to_tokens(redex_parent, &redex_args, active_comb, &mut visitor);
-    }
-
-    fn traverse_to_tokens(
-        self,
-        redex_parent: Option<NodeKey>,
-        redex_args: &[NodeKey],
-        active_comb: Option<NodeComb>,
-        visitor: &mut dyn FnMut(&str, NodeRole, Option<NodeKey>),
-    ) {
-        let initial_state = TraverseState {
-            current_key: self.0.root,
-            current_role: NodeRole::Normal,
-            is_rhs_of_app: false,
-            is_redex_head: false,
-        };
-
-        self.traverse_to_tokens_rec(
-            initial_state,
-            redex_parent,
-            redex_args,
-            active_comb,
-            visitor,
-        );
-    }
-
-    #[allow(clippy::too_many_lines)]
-    fn traverse_to_tokens_rec(
-        self,
-        mut state: TraverseState,
-        redex_parent: Option<NodeKey>,
-        redex_args: &[NodeKey],
-        active_comb: Option<NodeComb>,
-        visitor: &mut dyn FnMut(&str, NodeRole, Option<NodeKey>),
-    ) {
-        let arena = &self.0.arena;
-        let current = state.current_key;
-
-        if state.current_role == NodeRole::Normal
-            && let Some(arg_idx) = redex_args.iter().position(|&k| k == current)
-            && let Some(comb) = active_comb
-        {
-            state.current_role = NodeRole::RedexArg(comb, arg_idx);
-        }
-
-        match arena.get(current) {
-            Ok(Node::App(lhs, rhs)) => {
-                if let Ok(Node::App(op_key, left_key)) = arena.get(*lhs)
-                    && let Ok(Node::Prim(Literal::Op(op))) = arena.get(*op_key)
-                {
-                    let need_parens = current != self.0.root;
-                    if need_parens {
-                        visitor("(", state.current_role, Some(current));
-                    }
-
-                    self.traverse_to_tokens_rec(
-                        TraverseState {
-                            current_key: *left_key,
-                            current_role: state.current_role,
-                            is_rhs_of_app: false,
-                            is_redex_head: false,
-                        },
-                        redex_parent,
-                        redex_args,
-                        active_comb,
-                        visitor,
-                    );
-
-                    visitor(" ", state.current_role, None);
-
-                    visitor(op.to_string().as_str(), state.current_role, Some(*op_key));
-
-                    visitor(" ", state.current_role, None);
-
-                    self.traverse_to_tokens_rec(
-                        TraverseState {
-                            current_key: *rhs,
-                            current_role: state.current_role,
-                            is_rhs_of_app: false,
-                            is_redex_head: false,
-                        },
-                        redex_parent,
-                        redex_args,
-                        active_comb,
-                        visitor,
-                    );
-
-                    if need_parens {
-                        visitor(")", state.current_role, Some(current));
-                    }
-                    return;
-                }
-
-                if state.is_rhs_of_app {
-                    visitor("(", state.current_role, Some(current));
-                }
-
-                let is_lhs_head = Some(current) == redex_parent;
-
-                self.traverse_to_tokens_rec(
-                    TraverseState {
-                        current_key: *lhs,
-                        current_role: state.current_role,
-                        is_rhs_of_app: false,
-                        is_redex_head: is_lhs_head,
-                    },
-                    redex_parent,
-                    redex_args,
-                    active_comb,
-                    visitor,
-                );
-
-                // visitor(" ", current_role, Some(current));
-
-                self.traverse_to_tokens_rec(
-                    TraverseState {
-                        current_key: *rhs,
-                        current_role: state.current_role,
-                        is_rhs_of_app: true,
-                        is_redex_head: false,
-                    },
-                    redex_parent,
-                    redex_args,
-                    active_comb,
-                    visitor,
-                );
-
-                if state.is_rhs_of_app {
-                    visitor(")", state.current_role, Some(current));
-                }
-            }
-            Ok(Node::Comb(x)) => {
-                let role = if state.is_redex_head {
-                    active_comb.map_or(NodeRole::RedexHead(*x), NodeRole::RedexHead)
-                } else {
-                    state.current_role
-                };
-                visitor(x.to_string().as_str(), role, Some(current));
-            }
-            Ok(Node::Prim(p)) => {
-                let role = state.current_role;
-                visitor(p.to_string().as_str(), role, Some(current));
-            }
-            Err(err) => visitor(err.to_string().as_str(), NodeRole::Normal, Some(current)),
-            Ok(Node::Indirection(_)) => unreachable!("arena.get() hides indirections"),
-        }
     }
 
     #[must_use]
@@ -275,25 +91,125 @@ impl<'a> EngineView<'a> {
 
         graph
     }
-}
 
-// TODO: Look into handling the two errors cases (resolved indirections and
-//       missing nodes from arena) instead of just writing the error to the
-//       result.
-impl Display for EngineView<'_> {
-    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
-        let mut output = String::new();
-        self.traverse(|text, _role, _key| {
-            output.push_str(text);
-        });
-        write!(f, "{output}")
+    #[must_use]
+    pub fn tokenize(&self) -> Vec<EngineToken> {
+        let spine = &self.0.spine;
+        let arena = &self.0.arena;
+
+        let mut redex_parent = None;
+        let mut redex_args = Vec::with_capacity(3);
+        let mut active_comb = None;
+
+        if let Some(&head_key) = spine.last()
+            && let Ok(Node::Comb(comb)) = arena.get(head_key)
+            && spine.len() > comb.arity()
+        {
+            redex_parent = spine.get(spine.len().saturating_sub(2)).copied();
+            active_comb = Some(*comb);
+
+            let arity = comb.arity();
+
+            let index_of_last = spine.len().saturating_sub(1);
+            let arguments_range = index_of_last.saturating_sub(arity)..index_of_last;
+
+            spine
+                .get(arguments_range)
+                .expect("we used arity to stay in bounds")
+                .iter()
+                .rev()
+                .for_each(|&app_key| {
+                    if let Ok(Node::App(_, rhs)) = arena.get(app_key) {
+                        redex_args.push(*rhs);
+                    }
+                });
+        }
+
+        let mut tokens = Vec::new();
+        let mut tokenizer = TokenizeVisitor {
+            arena,
+            state: TraverseState {
+                current_role: NodeRole::Normal,
+                is_rhs_of_app: false,
+                is_redex_head: false,
+            },
+            redex_parent,
+            redex_args: &redex_args,
+            active_comb,
+            tokens: &mut tokens,
+            root: self.0.root,
+        };
+
+        tokenizer.visit_node(self.0.root);
+        tokens
     }
 }
 
-#[derive(Debug, Clone, Copy, PartialEq, Eq, PartialOrd, Ord)]
-struct TraverseState {
-    current_key: NodeKey,
-    current_role: NodeRole,
-    is_rhs_of_app: bool,
-    is_redex_head: bool,
+impl Display for EngineView<'_> {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        for token in self.tokenize() {
+            write!(f, "{}", token.text)?;
+        }
+        Ok(())
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    #![expect(clippy::unwrap_used)]
+    use super::*;
+    use lexor_parser::parse_ski;
+
+    #[test]
+    fn test_engine_view_roles() {
+        let root = parse_ski("S K I 1 2").unwrap();
+        let mut engine = Engine::from_tree(root);
+        engine.unwind(engine.root).unwrap();
+
+        let view = EngineView::from_engine(&engine);
+        let tokens = view.tokenize();
+
+        let get_role =
+            |target: &str| -> NodeRole { tokens.iter().find(|t| t.text == target).unwrap().role };
+
+        assert_eq!(get_role("S"), NodeRole::RedexHead(NodeComb::S));
+        assert_eq!(get_role("K"), NodeRole::RedexArg(NodeComb::S, 1));
+        assert_eq!(get_role("I"), NodeRole::RedexArg(NodeComb::S, 2));
+        assert_eq!(get_role("1"), NodeRole::RedexArg(NodeComb::S, 3));
+        assert_eq!(get_role("2"), NodeRole::Normal);
+    }
+
+    #[test]
+    fn test_engine_view_infix_formatting() {
+        let root1 = parse_ski("+ 1 (* 2 3)").unwrap();
+        let engine1 = Engine::from_tree(root1);
+        let view1 = EngineView::from_engine(&engine1);
+        assert_eq!(format!("{view1}"), "1 + (2 * 3)");
+
+        let root2 = parse_ski("+ (+ 1 2) 3").unwrap();
+        let engine2 = Engine::from_tree(root2);
+        let view2 = EngineView::from_engine(&engine2);
+        assert_eq!(format!("{view2}"), "(1 + 2) + 3");
+
+        let root3 = parse_ski("* (+ 1 2) (- 3 4)").unwrap();
+        let engine3 = Engine::from_tree(root3);
+        let view3 = EngineView::from_engine(&engine3);
+        assert_eq!(format!("{view3}"), "(1 + 2) * (3 - 4)");
+    }
+
+    #[test]
+    fn test_engine_view_parens_standard() {
+        let root = parse_ski("S (K I 1)").unwrap();
+        let engine = Engine::from_tree(root);
+        let view = EngineView::from_engine(&engine);
+        assert_eq!(format!("{view}"), "S(KI1)");
+    }
+
+    #[test]
+    fn test_engine_view_parens_infix() {
+        let root = parse_ski("S (K I + 2)").unwrap();
+        let engine = Engine::from_tree(root);
+        let view = EngineView::from_engine(&engine);
+        assert_eq!(format!("{view}"), "S(KI + 2)");
+    }
 }

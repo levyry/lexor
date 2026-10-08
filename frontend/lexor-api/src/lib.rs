@@ -74,15 +74,15 @@ pub fn reduce_expression(req: &ReductionRequest) -> ReductionResponse {
 
         let result = strat.compute_with(&effective_input, |view: EngineView| {
             if wants_steps {
-                let mut step_tokens = vec![];
-
-                view.traverse(|text, role, key| {
-                    step_tokens.push(RenderToken {
-                        text: text.to_owned(),
-                        style: role.into(),
-                        node_key: key,
-                    });
-                });
+                let step_tokens = view
+                    .tokenize()
+                    .into_iter()
+                    .map(|t| RenderToken {
+                        text: t.text,
+                        style: t.role.into(),
+                        node_key: t.key,
+                    })
+                    .collect();
 
                 steps.push(step_tokens);
             }

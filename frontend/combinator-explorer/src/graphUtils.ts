@@ -1,7 +1,9 @@
 import cytoscape from 'cytoscape';
 import dagre from 'cytoscape-dagre';
+import cytoscapeSvg from 'cytoscape-svg';
 
 cytoscape.use(dagre);
+cytoscape.use(cytoscapeSvg);
 
 export const getRedexColors = (label: string) => {
     const colors: Record<string, any> = {

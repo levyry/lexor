@@ -1,4 +1,4 @@
-import { useEffect, useState } from 'preact/hooks';
+import { useEffect, useRef, useState } from 'preact/hooks';
 import { ComponentContainer, GoldenLayout } from 'golden-layout';
 import { useStore } from '../store';
 import { getRedexColors, groupStepTokens } from '../graphUtils';
@@ -111,8 +111,41 @@ export const WorksheetPanel = ({ sourceId, layout, container }: { sourceId: numb
 
     const renderStepTokens = (stepTokens: any[]) => <RenderStepTokens stepTokens={stepTokens} />;
 
+    const fontMenuRef = useRef<HTMLDivElement>(null);
+    const addMenuRef = useRef<HTMLDivElement>(null);
+    const settingsMenuRef = useRef<HTMLDivElement>(null);
+
+    useEffect(() => {
+        if (!isFontMenuOpen && !isAddMenuOpen && !isSettingsOpen) return;
+        const handleOutsideClick = (e: MouseEvent) => {
+            const target = e.target as Node;
+            if (isFontMenuOpen && fontMenuRef.current && !fontMenuRef.current.contains(target)) {
+                setIsFontMenuOpen(false);
+            }
+            if (isAddMenuOpen && addMenuRef.current && !addMenuRef.current.contains(target)) {
+                setIsAddMenuOpen(false);
+            }
+            if (isSettingsOpen && settingsMenuRef.current && !settingsMenuRef.current.contains(target)) {
+                setIsSettingsOpen(false);
+            }
+        };
+        const handleKeyDown = (e: KeyboardEvent) => {
+            if (e.key === 'Escape') {
+                setIsFontMenuOpen(false);
+                setIsAddMenuOpen(false);
+                setIsSettingsOpen(false);
+            }
+        };
+        document.addEventListener('mousedown', handleOutsideClick);
+        document.addEventListener('keydown', handleKeyDown);
+        return () => {
+            document.removeEventListener('mousedown', handleOutsideClick);
+            document.removeEventListener('keydown', handleKeyDown);
+        };
+    }, [isFontMenuOpen, isAddMenuOpen, isSettingsOpen]);
+
     const handleMenuBlur = (e: any, closeFn: () => void) => {
-        if (!e.currentTarget.contains(e.relatedTarget as Node)) closeFn();
+        if (e.relatedTarget && !e.currentTarget.contains(e.relatedTarget as Node)) closeFn();
     };
 
     return (
@@ -123,7 +156,7 @@ export const WorksheetPanel = ({ sourceId, layout, container }: { sourceId: numb
                 <div className="flex items-center gap-2 w-full">
 
                     {/* Font size */}
-                    <div className="relative" onBlur={e => handleMenuBlur(e, () => setIsFontMenuOpen(false))}>
+                    <div className="relative" ref={fontMenuRef} onBlur={e => handleMenuBlur(e, () => setIsFontMenuOpen(false))}>
                         <button onClick={() => setIsFontMenuOpen(!isFontMenuOpen)} className={`${btnBase} px-3 flex items-center justify-center`} title="Change Font Size">
                             <Codicon name="text-size" className="text-gray-400 shrink-0" />
                         </button>
@@ -148,7 +181,7 @@ export const WorksheetPanel = ({ sourceId, layout, container }: { sourceId: numb
                     </div>
 
                     {/* Add new... */}
-                    <div className="relative" onBlur={e => handleMenuBlur(e, () => setIsAddMenuOpen(false))}>
+                    <div className="relative" ref={addMenuRef} onBlur={e => handleMenuBlur(e, () => setIsAddMenuOpen(false))}>
                         <button onClick={() => setIsAddMenuOpen(!isAddMenuOpen)} className={`${btnBase} px-3 flex items-center gap-1.5`} title="Add a new pane">
                             <Codicon name="add" className="text-gray-400 shrink-0" />
                             <span className="hidden @md:inline whitespace-nowrap">Add new...</span>
@@ -171,7 +204,7 @@ export const WorksheetPanel = ({ sourceId, layout, container }: { sourceId: numb
                     <div className="flex-1" />
 
                     {/* Settings dropdown */}
-                    <div className="relative" onBlur={e => handleMenuBlur(e, () => setIsSettingsOpen(false))}>
+                    <div className="relative" ref={settingsMenuRef} onBlur={e => handleMenuBlur(e, () => setIsSettingsOpen(false))}>
                         <button onClick={() => setIsSettingsOpen(!isSettingsOpen)} className={`${btnBase} px-3 flex items-center gap-1.5`} title="Configuration">
                             <Codicon name="settings-gear" className="text-gray-400 shrink-0" />
                             <span className="hidden @md:inline whitespace-nowrap">Settings</span>
@@ -180,8 +213,14 @@ export const WorksheetPanel = ({ sourceId, layout, container }: { sourceId: numb
                             <div className="absolute top-full right-0 mt-1 bg-[#252526] border border-[#444] rounded shadow-xl z-50 py-3 px-3 min-w-[220px] flex flex-col gap-3">
                                 {isSki && (
                                     <>
-                                        <label className="flex items-center gap-2 cursor-pointer hover:text-white text-gray-300">
-                                            <input type="checkbox" checked={source.nodeSharing} onChange={e => updateSource(sourceId, { nodeSharing: e.currentTarget.checked })} />
+                                        <label htmlFor={`worksheet-share-subtrees-${sourceId}`} className="flex items-center gap-2 cursor-pointer hover:text-white text-gray-300 select-none">
+                                            <input
+                                                id={`worksheet-share-subtrees-${sourceId}`}
+                                                type="checkbox"
+                                                checked={source.nodeSharing}
+                                                onChange={e => updateSource(sourceId, { nodeSharing: e.currentTarget.checked })}
+                                                className="cursor-pointer"
+                                            />
                                             Share subtrees
                                         </label>
                                         <button

@@ -34,13 +34,32 @@ export const PathsGraphPanel = ({ sourceId, panelId: initialPanelId }: { sourceI
     const idleHeadOffsetsRef = useRef<Map<number, number>>(new Map());
     const lastStateSpaceRef = useRef<any>(null);
     const lastRankSepRef = useRef<number>(180);
+    const settingsMenuRef = useRef<HTMLDivElement>(null);
 
     const activeEdgeId = hoveredOverlayEdgeId || hoveredCytoEdgeId;
 
     useEffect(() => { useStore.getState().setActiveGraphForSource(sourceId, panelId); }, [panelId, sourceId]);
 
+    useEffect(() => {
+        if (!isSettingsOpen) return;
+        const handleOutsideClick = (e: MouseEvent) => {
+            if (settingsMenuRef.current && !settingsMenuRef.current.contains(e.target as Node)) {
+                setIsSettingsOpen(false);
+            }
+        };
+        const handleKeyDown = (e: KeyboardEvent) => {
+            if (e.key === 'Escape') setIsSettingsOpen(false);
+        };
+        document.addEventListener('mousedown', handleOutsideClick);
+        document.addEventListener('keydown', handleKeyDown);
+        return () => {
+            document.removeEventListener('mousedown', handleOutsideClick);
+            document.removeEventListener('keydown', handleKeyDown);
+        };
+    }, [isSettingsOpen]);
+
     const handleMenuBlur = (e: any, closeFn: () => void) => {
-        if (!e.currentTarget.contains(e.relatedTarget as Node)) closeFn();
+        if (e.relatedTarget && !e.currentTarget.contains(e.relatedTarget as Node)) closeFn();
     };
 
     const updateOverlayPos = () => {
@@ -273,6 +292,31 @@ export const PathsGraphPanel = ({ sourceId, panelId: initialPanelId }: { sourceI
             cy.fit(undefined, 50);
             updateOverlayPos();
             setCurrentZoom(cy.zoom());
+        }
+    };
+
+    const handleExportSvg = () => {
+        if (!cyRef.current || !source?.stateSpace) return;
+        const cy = cyRef.current;
+        try {
+            const svgContent = (cy as any).svg({
+                full: true,
+                bg: '#1e1e1e',
+            });
+            const safeName = (source.skiInput || 'graph')
+                .replace(/[^a-zA-Z0-9_-]/g, '_')
+                .slice(0, 30);
+            const blob = new Blob([svgContent], { type: 'image/svg+xml;charset=utf-8' });
+            const url = URL.createObjectURL(blob);
+            const link = document.createElement('a');
+            link.download = `state-space-${safeName}.svg`;
+            link.href = url;
+            document.body.appendChild(link);
+            link.click();
+            document.body.removeChild(link);
+            URL.revokeObjectURL(url);
+        } catch (err) {
+            console.error('Failed to export SVG:', err);
         }
     };
 
@@ -519,7 +563,7 @@ export const PathsGraphPanel = ({ sourceId, panelId: initialPanelId }: { sourceI
                 <div className="flex-1" />
 
                 {/* Settings Dropdown */}
-                <div className="relative" onBlur={e => handleMenuBlur(e, () => setIsSettingsOpen(false))}>
+                <div className="relative" ref={settingsMenuRef} onBlur={e => handleMenuBlur(e, () => setIsSettingsOpen(false))}>
                     <button
                         onClick={() => setIsSettingsOpen(!isSettingsOpen)}
                         className="bg-[#333] hover:bg-[#444] border border-[#555] px-3 h-[30px] rounded text-white text-sm font-medium transition-colors cursor-pointer flex items-center gap-1.5"
@@ -530,20 +574,24 @@ export const PathsGraphPanel = ({ sourceId, panelId: initialPanelId }: { sourceI
                     </button>
                     {isSettingsOpen && (
                         <div className="absolute top-full right-0 mt-1 bg-[#252526] border border-[#444] rounded shadow-xl z-50 py-3 px-3 min-w-[220px] flex flex-col gap-2.5">
-                            <label className="flex items-center gap-2 cursor-pointer hover:text-white text-gray-300 text-sm select-none">
+                            <label htmlFor={`paths-normal-order-${panelId}`} className="flex items-center gap-2 cursor-pointer hover:text-white text-gray-300 text-sm select-none">
                                 <input
+                                    id={`paths-normal-order-${panelId}`}
                                     type="checkbox"
                                     checked={showNormalOrder}
                                     onChange={e => setShowNormalOrder(e.currentTarget.checked)}
+                                    className="cursor-pointer"
                                 />
                                 Normal Order Path
                             </label>
 
-                            <label className="flex items-center gap-2 cursor-pointer hover:text-white text-gray-300 text-sm select-none">
+                            <label htmlFor={`paths-redex-highlight-${panelId}`} className="flex items-center gap-2 cursor-pointer hover:text-white text-gray-300 text-sm select-none">
                                 <input
+                                    id={`paths-redex-highlight-${panelId}`}
                                     type="checkbox"
                                     checked={enableHighlighting}
                                     onChange={e => setEnableHighlighting(e.currentTarget.checked)}
+                                    className="cursor-pointer"
                                 />
                                 Redex Highlighting
                             </label>
@@ -552,32 +600,38 @@ export const PathsGraphPanel = ({ sourceId, panelId: initialPanelId }: { sourceI
 
                             <span className="text-xs text-gray-500 uppercase font-bold tracking-wider">Node Expansion</span>
 
-                            <label className="flex items-center gap-2 cursor-pointer hover:text-white text-gray-300 text-sm select-none">
+                            <label htmlFor={`paths-exp-none-${panelId}`} className="flex items-center gap-2 cursor-pointer hover:text-white text-gray-300 text-sm select-none">
                                 <input
+                                    id={`paths-exp-none-${panelId}`}
                                     type="radio"
-                                    name="nodeExpansion"
+                                    name={`nodeExpansion-${panelId}`}
                                     checked={expansionMode === 'none'}
                                     onChange={() => setExpansionMode('none')}
+                                    className="cursor-pointer"
                                 />
                                 Selected Only
                             </label>
 
-                            <label className="flex items-center gap-2 cursor-pointer hover:text-white text-gray-300 text-sm select-none">
+                            <label htmlFor={`paths-exp-normal-${panelId}`} className="flex items-center gap-2 cursor-pointer hover:text-white text-gray-300 text-sm select-none">
                                 <input
+                                    id={`paths-exp-normal-${panelId}`}
                                     type="radio"
-                                    name="nodeExpansion"
+                                    name={`nodeExpansion-${panelId}`}
                                     checked={expansionMode === 'normal'}
                                     onChange={() => setExpansionMode('normal')}
+                                    className="cursor-pointer"
                                 />
                                 Expand Normal Order Path
                             </label>
 
-                            <label className="flex items-center gap-2 cursor-pointer hover:text-white text-gray-300 text-sm select-none">
+                            <label htmlFor={`paths-exp-all-${panelId}`} className="flex items-center gap-2 cursor-pointer hover:text-white text-gray-300 text-sm select-none">
                                 <input
+                                    id={`paths-exp-all-${panelId}`}
                                     type="radio"
-                                    name="nodeExpansion"
+                                    name={`nodeExpansion-${panelId}`}
                                     checked={expansionMode === 'all'}
                                     onChange={() => setExpansionMode('all')}
+                                    className="cursor-pointer"
                                 />
                                 Expand All Nodes
                             </label>
@@ -604,6 +658,18 @@ export const PathsGraphPanel = ({ sourceId, panelId: initialPanelId }: { sourceI
                                     <span>300px</span>
                                 </div>
                             </div>
+
+                            <div className="h-px bg-[#333] my-1" />
+
+                            <button
+                                onClick={handleExportSvg}
+                                disabled={!source?.stateSpace}
+                                className="w-full bg-[#333] hover:bg-[#444] disabled:opacity-50 border border-[#555] px-3 py-1.5 rounded text-white text-xs font-medium transition-colors cursor-pointer flex items-center justify-center gap-1.5"
+                                title="Export State Space Graph as Vector SVG"
+                            >
+                                <Codicon name="export" className="text-gray-400 shrink-0" />
+                                <span>Export SVG</span>
+                            </button>
                         </div>
                     )}
                 </div>

@@ -3,6 +3,7 @@ import CytoscapeComponent from 'react-cytoscapejs';
 import cytoscape from 'cytoscape';
 import { useStore } from '../store';
 import { buildCytoscapeElements, cytoStylesheet } from '../graphUtils';
+import { Codicon } from '../components/Codicon';
 
 export const AstGraphPanel = ({ sourceId, panelId: initialPanelId }: { sourceId: number, panelId?: string }) => {
     const source = useStore(state => state.sources[sourceId]);
@@ -76,12 +77,49 @@ export const AstGraphPanel = ({ sourceId, panelId: initialPanelId }: { sourceId:
 
     const handleStep = (delta: number) => useStore.getState().setGraphStep(panelId, Math.max(0, Math.min(maxStep, step + delta)));
 
+    const handleExportSvg = () => {
+        if (!cyRef.current || !elements.length) return;
+        const cy = cyRef.current;
+        try {
+            const svgContent = (cy as any).svg({
+                full: true,
+                bg: '#1e1e1e',
+            });
+            const safeName = (source.skiInput || 'ast')
+                .replace(/[^a-zA-Z0-9_-]/g, '_')
+                .slice(0, 30);
+            const blob = new Blob([svgContent], { type: 'image/svg+xml;charset=utf-8' });
+            const url = URL.createObjectURL(blob);
+            const link = document.createElement('a');
+            link.download = `ast-step-${step + 1}-${safeName}.svg`;
+            link.href = url;
+            document.body.appendChild(link);
+            link.click();
+            document.body.removeChild(link);
+            URL.revokeObjectURL(url);
+        } catch (err) {
+            console.error('Failed to export AST SVG:', err);
+        }
+    };
+
     return (
         <div className="flex flex-col h-full w-full bg-[#1e1e1e]" onMouseDown={() => useStore.getState().setActiveGraphForSource(sourceId, panelId)}>
             <div className={`flex items-center justify-between p-2 border-b shrink-0 transition-colors ${isFocused ? 'border-blue-500 bg-[#2d2d2d]' : 'border-[#333] bg-[#252526]'}`}>
-                <button disabled={step === 0} onClick={() => handleStep(-1)} className="bg-[#333] hover:bg-[#444] disabled:opacity-50 px-4 py-1 rounded text-white text-base">←</button>
-                <span className="text-base font-mono text-gray-400 select-none">Step {elements.length ? step + 1 : 0} / {source.graphHistory.length}</span>
-                <button disabled={step >= maxStep} onClick={() => handleStep(1)} className="bg-[#333] hover:bg-[#444] disabled:opacity-50 px-4 py-1 rounded text-white text-base">→</button>
+                <div className="flex items-center gap-2">
+                    <button disabled={step === 0} onClick={() => handleStep(-1)} className="bg-[#333] hover:bg-[#444] disabled:opacity-50 px-4 py-1 rounded text-white text-base cursor-pointer">←</button>
+                    <span className="text-base font-mono text-gray-400 select-none">Step {elements.length ? step + 1 : 0} / {source.graphHistory.length}</span>
+                    <button disabled={step >= maxStep} onClick={() => handleStep(1)} className="bg-[#333] hover:bg-[#444] disabled:opacity-50 px-4 py-1 rounded text-white text-base cursor-pointer">→</button>
+                </div>
+                {elements.length > 0 && (
+                    <button
+                        onClick={handleExportSvg}
+                        className="bg-[#333] hover:bg-[#444] border border-[#555] px-2.5 h-[30px] rounded text-white text-sm font-medium transition-colors cursor-pointer flex items-center gap-1.5"
+                        title="Export AST Graph as Vector SVG"
+                    >
+                        <Codicon name="export" className="text-gray-400 shrink-0" />
+                        <span className="hidden sm:inline whitespace-nowrap">Export SVG</span>
+                    </button>
+                )}
             </div>
             <div ref={wrapperRef} className="flex-1 w-full relative min-h-[1px]">
                 {!isReady ? <div className="absolute inset-0 flex items-center justify-center text-gray-500 text-base">Initializing...</div>

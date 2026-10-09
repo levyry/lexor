@@ -10,6 +10,7 @@
 		"@vscode/codicons": "^0.0.46-24",
 		"cytoscape": "^3.34.3",
 		"cytoscape-dagre": "^4.0.1",
+		"cytoscape-svg": "^0.4.0",
 		"golden-layout": "^2.6.0",
 		"preact": "^10.26.9",
 		"react-cytoscapejs": "^2.0.0",

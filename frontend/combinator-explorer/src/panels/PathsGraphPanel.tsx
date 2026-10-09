@@ -67,12 +67,12 @@ export const PathsGraphPanel = ({ sourceId, panelId: initialPanelId }: { sourceI
     const elements = useMemo(() => {
         if (!source?.stateSpace) return [];
         const { nodes, edges } = source.stateSpace;
-        
+
         const cyNodes = nodes.map((n: any) => {
             const isSelected = n.id === selectedNodeId;
             const isNormal = normalOrderNodeIds.has(n.id);
-            const isExpanded = expansionMode === 'all' || 
-                (expansionMode === 'normal' && isNormal) || 
+            const isExpanded = expansionMode === 'all' ||
+                (expansionMode === 'normal' && isNormal) ||
                 isSelected;
 
             let bgColor = '#444';
@@ -185,7 +185,7 @@ export const PathsGraphPanel = ({ sourceId, panelId: initialPanelId }: { sourceI
 
     useEffect(() => {
         if (!containerRef.current) return;
-        
+
         const cy = cytoscape({
             container: containerRef.current,
             style: customStylesheet,
@@ -195,7 +195,7 @@ export const PathsGraphPanel = ({ sourceId, panelId: initialPanelId }: { sourceI
         cyRef.current = cy;
 
         cy.on('pan zoom position', updateOverlayPos);
-        
+
         cy.on('mouseover', 'edge', (event) => {
             setHoveredCytoEdgeId(event.target.id());
         });
@@ -233,10 +233,10 @@ export const PathsGraphPanel = ({ sourceId, panelId: initialPanelId }: { sourceI
     useEffect(() => {
         if (!cyRef.current || elements.length === 0) return;
         const cy = cyRef.current;
-        
+
         cy.elements().remove();
         cy.add(elements);
-        
+
         cy.layout({
             name: 'dagre',
             rankDir: 'TB',
@@ -274,7 +274,7 @@ export const PathsGraphPanel = ({ sourceId, panelId: initialPanelId }: { sourceI
         }
 
         const outgoingEdges = edges.filter((e: any) => e.from === selectedNodeId);
-        
+
         if (outgoingEdges.length === 0) {
             const node = nodes.find((n: any) => n.id === selectedNodeId);
             const toks = [{ text: node?.expression || '', style: 'Normal', edgeId: null }];
@@ -317,7 +317,7 @@ export const PathsGraphPanel = ({ sourceId, panelId: initialPanelId }: { sourceI
                 return { displayTokens: tokensWithEdge, activeTargetId };
             }
         }
-        
+
         return { displayTokens: idleTokens, activeTargetId };
     }, [source?.stateSpace, selectedNodeId, activeEdgeId, enableHighlighting]);
 
@@ -370,8 +370,8 @@ export const PathsGraphPanel = ({ sourceId, panelId: initialPanelId }: { sourceI
     if (!source) return <div className="p-2 text-red-400 text-base">Source deleted.</div>;
 
     return (
-        <div 
-            className="flex flex-col h-full w-full bg-[#1e1e1e]" 
+        <div
+            className="flex flex-col h-full w-full bg-[#1e1e1e]"
             onMouseDown={() => useStore.getState().setActiveGraphForSource(sourceId, panelId)}
             onMouseMove={e => setMousePos({ x: e.clientX, y: e.clientY })}
         >
@@ -379,11 +379,21 @@ export const PathsGraphPanel = ({ sourceId, panelId: initialPanelId }: { sourceI
                 {/* Generate Graph Button */}
                 <button
                     onClick={() => useStore.getState().generateStateSpace(sourceId)}
-                    className="bg-[#333] hover:bg-[#444] border border-[#555] px-3 h-[30px] rounded text-white text-sm font-medium transition-colors cursor-pointer flex items-center gap-1.5"
+                    disabled={source?.isGeneratingStateSpace}
+                    className={`bg-[#333] hover:bg-[#444] border border-[#555] px-3 h-[30px] rounded text-white text-sm font-medium transition-colors flex items-center gap-1.5 ${source?.isGeneratingStateSpace ? 'opacity-70 cursor-wait' : 'cursor-pointer'}`}
                     title="Generate State Space Graph"
                 >
-                    <Codicon name="type-hierarchy" className="text-gray-400 shrink-0" />
-                    <span className="hidden @md:inline whitespace-nowrap">Generate Graph</span>
+                    {source?.isGeneratingStateSpace ? (
+                        <>
+                            <Codicon name="loading" className="text-gray-400 shrink-0 codicon-modifier-spin" />
+                            <span className="hidden @md:inline whitespace-nowrap">Generating...</span>
+                        </>
+                    ) : (
+                        <>
+                            <Codicon name="type-hierarchy" className="text-gray-400 shrink-0" />
+                            <span className="hidden @md:inline whitespace-nowrap">Generate Graph</span>
+                        </>
+                    )}
                 </button>
 
                 {/* Space in between */}
@@ -402,19 +412,19 @@ export const PathsGraphPanel = ({ sourceId, panelId: initialPanelId }: { sourceI
                     {isSettingsOpen && (
                         <div className="absolute top-full right-0 mt-1 bg-[#252526] border border-[#444] rounded shadow-xl z-50 py-3 px-3 min-w-[220px] flex flex-col gap-2.5">
                             <label className="flex items-center gap-2 cursor-pointer hover:text-white text-gray-300 text-sm select-none">
-                                <input 
-                                    type="checkbox" 
-                                    checked={showNormalOrder} 
-                                    onChange={e => setShowNormalOrder(e.currentTarget.checked)} 
+                                <input
+                                    type="checkbox"
+                                    checked={showNormalOrder}
+                                    onChange={e => setShowNormalOrder(e.currentTarget.checked)}
                                 />
                                 Normal Order Path
                             </label>
 
                             <label className="flex items-center gap-2 cursor-pointer hover:text-white text-gray-300 text-sm select-none">
-                                <input 
-                                    type="checkbox" 
-                                    checked={enableHighlighting} 
-                                    onChange={e => setEnableHighlighting(e.currentTarget.checked)} 
+                                <input
+                                    type="checkbox"
+                                    checked={enableHighlighting}
+                                    onChange={e => setEnableHighlighting(e.currentTarget.checked)}
                                 />
                                 Redex Highlighting
                             </label>
@@ -422,33 +432,33 @@ export const PathsGraphPanel = ({ sourceId, panelId: initialPanelId }: { sourceI
                             <div className="h-px bg-[#333] my-1" />
 
                             <span className="text-xs text-gray-500 uppercase font-bold tracking-wider">Node Expansion</span>
-                            
+
                             <label className="flex items-center gap-2 cursor-pointer hover:text-white text-gray-300 text-sm select-none">
-                                <input 
-                                    type="radio" 
-                                    name="nodeExpansion" 
-                                    checked={expansionMode === 'none'} 
-                                    onChange={() => setExpansionMode('none')} 
+                                <input
+                                    type="radio"
+                                    name="nodeExpansion"
+                                    checked={expansionMode === 'none'}
+                                    onChange={() => setExpansionMode('none')}
                                 />
                                 Selected Only
                             </label>
 
                             <label className="flex items-center gap-2 cursor-pointer hover:text-white text-gray-300 text-sm select-none">
-                                <input 
-                                    type="radio" 
-                                    name="nodeExpansion" 
-                                    checked={expansionMode === 'normal'} 
-                                    onChange={() => setExpansionMode('normal')} 
+                                <input
+                                    type="radio"
+                                    name="nodeExpansion"
+                                    checked={expansionMode === 'normal'}
+                                    onChange={() => setExpansionMode('normal')}
                                 />
                                 Expand Normal Order Path
                             </label>
 
                             <label className="flex items-center gap-2 cursor-pointer hover:text-white text-gray-300 text-sm select-none">
-                                <input 
-                                    type="radio" 
-                                    name="nodeExpansion" 
-                                    checked={expansionMode === 'all'} 
-                                    onChange={() => setExpansionMode('all')} 
+                                <input
+                                    type="radio"
+                                    name="nodeExpansion"
+                                    checked={expansionMode === 'all'}
+                                    onChange={() => setExpansionMode('all')}
                                 />
                                 Expand All Nodes
                             </label>
@@ -476,15 +486,25 @@ export const PathsGraphPanel = ({ sourceId, panelId: initialPanelId }: { sourceI
 
                 {!source.stateSpace && (
                     <div className="absolute inset-0 flex items-center justify-center flex-col text-gray-500 p-8 text-center pointer-events-none">
-                        <Codicon name="type-hierarchy" className="text-[48px] mb-4 opacity-30" />
-                        <h2 className="text-lg font-bold text-gray-400 mb-2">No State Space Generated</h2>
-                        <p className="text-sm max-w-sm">Click the button above to explore all possible non-deterministic reduction paths for the current expression.</p>
-                        {source.error && <p className="mt-4 text-red-400 text-xs break-all">{source.error}</p>}
+                        {source?.isGeneratingStateSpace ? (
+                            <>
+                                <Codicon name="loading" className="text-[48px] mb-4 opacity-50 codicon-modifier-spin text-blue-400" />
+                                <h2 className="text-lg font-bold text-gray-300 mb-2">Generating State Space...</h2>
+                                <p className="text-sm max-w-sm">Exploring reduction graph in background worker...</p>
+                            </>
+                        ) : (
+                            <>
+                                <Codicon name="type-hierarchy" className="text-[48px] mb-4 opacity-30" />
+                                <h2 className="text-lg font-bold text-gray-400 mb-2">No State Space Generated</h2>
+                                <p className="text-sm max-w-sm">Click the button above to generate a graph of all possible reduction paths for the current expression.</p>
+                                {source?.error && <p className="mt-4 text-red-400 text-xs break-all">{source.error}</p>}
+                            </>
+                        )}
                     </div>
                 )}
 
                 {source.stateSpace && enableHighlighting && nodePos.x > -500 && displayTokens && (
-                    <div 
+                    <div
                         ref={boxRef}
                         onMouseLeave={() => handleTokenHover(null)}
                         className="absolute z-10 pointer-events-auto font-mono flex items-center bg-[#1e1e1e] border border-blue-500 rounded p-3 text-white text-lg shadow-2xl whitespace-nowrap gap-x-[2px]"
@@ -493,13 +513,13 @@ export const PathsGraphPanel = ({ sourceId, panelId: initialPanelId }: { sourceI
                             transform: 'translateY(-50%)',
                         }}
                     >
-                        <RenderStepTokens 
-                            stepTokens={displayTokens} 
+                        <RenderStepTokens
+                            stepTokens={displayTokens}
                             activeTargetId={activeTargetId}
                             headRef={headRef}
-                            isHoverable={true} 
-                            onTokenHover={handleTokenHover} 
-                            onTokenClick={(id) => { if (id !== null) setSelectedNodeId(id); }} 
+                            isHoverable={true}
+                            onTokenHover={handleTokenHover}
+                            onTokenClick={(id) => { if (id !== null) setSelectedNodeId(id); }}
                         />
                     </div>
                 )}

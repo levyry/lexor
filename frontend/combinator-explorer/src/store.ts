@@ -1,6 +1,7 @@
 import { create } from 'zustand';
 import { persist } from 'zustand/middleware';
-import { process_worker_job, desugar_ski_church } from './wasm/lexor_api.js';
+import { desugar_ski_church } from './wasm/lexor_api.js';
+import { runWorkerTask } from './workers/workerClient';
 
 export interface Source {
     id: number;
@@ -18,6 +19,7 @@ export interface Source {
     stateSpace: any | null;
     selectedNodeId: number;
     error: string | null;
+    isGeneratingStateSpace?: boolean;
 }
 
 interface AppState {
@@ -30,18 +32,18 @@ interface AppState {
     addSource: (kind: 'Ski' | 'Lambda') => number;
     removeSource: (id: number) => void;
     updateSource: (id: number, updater: Partial<Source> | ((s: Source) => Partial<Source>)) => void;
-    evaluate: (id: number) => void;
-    convertSkiToLambda: (id: number) => void;
+    evaluate: (id: number) => Promise<void> | void;
+    convertSkiToLambda: (id: number) => Promise<void> | void;
     desugarSkiInput: (id: number) => void;
     appendLambdaComb: (id: number, combDef: string) => void;
-    generateStateSpace: (id: number) => void;
+    generateStateSpace: (id: number) => Promise<void> | void;
 }
 
 const createDefaultSource = (id: number, kind: 'Ski' | 'Lambda'): Source => ({
     id, kind, skiInput: "SKISKI", lambdaInput: "\\x.\\y.\\z.y(x z)",
     skiStrategy: "NormalForm", lambdaStrategy: "NormalOrder",
     fontSize: 20, nodeSharing: true, desugarChurch: false, reductionSteps: [], graphHistory: [],
-    convertedLambda: "", stateSpace: null, error: null, selectedNodeId: 0
+    convertedLambda: "", stateSpace: null, error: null, selectedNodeId: 0, isGeneratingStateSpace: false
 });
 
 export const useStore = create<AppState>()(persist((set, get) => ({
@@ -84,21 +86,21 @@ export const useStore = create<AppState>()(persist((set, get) => ({
             console.error('Failed to desugar Church numerals:', e);
         }
     },
-    convertSkiToLambda: (id) => {
+    convertSkiToLambda: async (id) => {
         try {
             const src = get().sources[id];
             if (!src) return;
-            const result = JSON.parse(process_worker_job(JSON.stringify({ type: "Conversion", source_id: id, input: src.skiInput })));
+            const result = await runWorkerTask({ type: "Conversion", source_id: id, input: src.skiInput });
             get().updateSource(id, { convertedLambda: result.result });
         } catch (e) { console.error(e); }
     },
-    evaluate: (id) => {
+    evaluate: async (id) => {
         const src = get().sources[id];
         if (!src) return;
         const isSki = src.kind === 'Ski';
 
         try {
-            const result = JSON.parse(process_worker_job(JSON.stringify({
+            const result = await runWorkerTask({
                 type: "Reduction", source_id: id,
                 strategy: isSki ? { Ski: src.skiStrategy } : { Lambda: src.lambdaStrategy },
                 state: isSki ? {
@@ -110,7 +112,7 @@ export const useStore = create<AppState>()(persist((set, get) => ({
                     }
                 } : { Lambda: { placeholder: false } },
                 input: isSki ? src.skiInput : src.lambdaInput
-            })));
+            });
 
             if (result.error) throw new Error(result.error);
 
@@ -125,19 +127,27 @@ export const useStore = create<AppState>()(persist((set, get) => ({
             });
         } catch (e) { get().updateSource(id, { error: String(e) }); }
     },
-    generateStateSpace: (id) => {
+    generateStateSpace: async (id) => {
         const src = get().sources[id];
         if (!src || src.kind !== 'Ski') return;
+        get().updateSource(id, { isGeneratingStateSpace: true, error: null });
         try {
-            const result = JSON.parse(process_worker_job(JSON.stringify({
+            const result = await runWorkerTask({
                 type: "StateSpace", source_id: id, input: src.skiInput
-            })));
+            });
             if (result.error) throw new Error(result.error);
             if (result.result?.Ok) {
-                get().updateSource(id, { stateSpace: result.result.Ok, error: null, selectedNodeId: 0 });
+                get().updateSource(id, {
+                    stateSpace: result.result.Ok,
+                    error: null,
+                    selectedNodeId: 0,
+                    isGeneratingStateSpace: false
+                });
             } else if (result.result?.Err) {
                 throw new Error(result.result.Err);
             }
-        } catch (e) { get().updateSource(id, { error: String(e) }); }
+        } catch (e) {
+            get().updateSource(id, { error: String(e), isGeneratingStateSpace: false });
+        }
     }
 }), { name: 'lexor-state-storage' }));

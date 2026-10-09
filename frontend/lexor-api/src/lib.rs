@@ -29,7 +29,14 @@ pub enum WorkerTask {
     Reduction(ReductionRequest),
     Conversion { source_id: SourceID, input: String },
     DesugarChurch { source_id: SourceID, input: String },
-    StateSpace { source_id: SourceID, input: String },
+    StateSpace {
+        source_id: SourceID,
+        input: String,
+        #[serde(default)]
+        max_nodes: Option<usize>,
+        #[serde(default)]
+        max_depth: Option<usize>,
+    },
 }
 
 #[derive(Debug, Serialize, Deserialize, Clone, PartialEq, Eq, PartialOrd, Ord, Hash)]
@@ -218,8 +225,10 @@ pub fn process_worker_job(request_json: &str) -> String {
                 result: result_str,
             }
         }
-        Ok(WorkerTask::StateSpace { source_id, input }) => {
-            let result = lexor_reducer::generate_state_space(&input)
+        Ok(WorkerTask::StateSpace { source_id, input, max_nodes, max_depth }) => {
+            let max_n = max_nodes.unwrap_or(lexor_reducer::DEFAULT_MAX_NODES);
+            let max_d = max_depth.unwrap_or(lexor_reducer::DEFAULT_MAX_DEPTH);
+            let result = lexor_reducer::generate_state_space_bounded(&input, max_n, max_d)
                 .map_err(|e| e.to_string())
                 .map(|space| {
                     use crate::response::{ApiStateSpace, ApiStateNode, ApiStateEdge};
@@ -238,6 +247,7 @@ pub fn process_worker_job(request_json: &str) -> String {
                                 node_key: t.key,
                             }).collect(),
                         }).collect(),
+                        truncated: space.truncated,
                     }
                 });
 

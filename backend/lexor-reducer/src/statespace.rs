@@ -31,7 +31,11 @@ pub struct StateEdge {
 pub struct StateSpace {
     pub nodes: Vec<StateNode>,
     pub edges: Vec<StateEdge>,
+    pub truncated: bool,
 }
+
+pub const DEFAULT_MAX_NODES: usize = 1000;
+pub const DEFAULT_MAX_DEPTH: usize = 50;
 
 pub struct RedexVisitor<'a> {
     arena: &'a Arena,
@@ -90,6 +94,14 @@ impl<'a> Visitor<'a> for RedexVisitor<'a> {
 }
 
 pub fn generate_state_space(input: &str) -> Result<StateSpace, ReductionError> {
+    generate_state_space_bounded(input, DEFAULT_MAX_NODES, DEFAULT_MAX_DEPTH)
+}
+
+pub fn generate_state_space_bounded(
+    input: &str,
+    max_nodes: usize,
+    max_depth: usize,
+) -> Result<StateSpace, ReductionError> {
     let root = lexor_parser::parse_ski(input)?;
     let initial_engine = Engine::from_tree(root);
 
@@ -98,6 +110,7 @@ pub fn generate_state_space(input: &str) -> Result<StateSpace, ReductionError> {
     let mut edge_set = HashSet::new();
     let mut state_map: HashMap<String, usize> = HashMap::new();
     let mut queue = VecDeque::new();
+    let mut truncated = false;
 
     let initial_expr = format!("{}", EngineView::from_engine(&initial_engine));
 
@@ -107,9 +120,14 @@ pub fn generate_state_space(input: &str) -> Result<StateSpace, ReductionError> {
     });
 
     state_map.insert(initial_expr, 0);
-    queue.push_back((0, initial_engine, true));
+    queue.push_back((0, initial_engine, true, 0));
 
-    while let Some((state_id, engine, is_on_normal_path)) = queue.pop_front() {
+    while let Some((state_id, engine, is_on_normal_path, depth)) = queue.pop_front() {
+        if depth >= max_depth {
+            truncated = true;
+            continue;
+        }
+
         let mut visitor = RedexVisitor {
             arena: &engine.arena,
             current_path: Vec::new(),
@@ -131,6 +149,11 @@ pub fn generate_state_space(input: &str) -> Result<StateSpace, ReductionError> {
             let next_id = if let Some(&id) = state_map.get(&next_expr) {
                 id
             } else {
+                if states.len() >= max_nodes {
+                    truncated = true;
+                    continue;
+                }
+
                 let id = states.len();
 
                 states.push(StateNode {
@@ -141,7 +164,7 @@ pub fn generate_state_space(input: &str) -> Result<StateSpace, ReductionError> {
                 let next_is_on_normal_path = is_on_normal_path && idx == 0;
 
                 state_map.insert(next_expr.clone(), id);
-                queue.push_back((id, next_engine, next_is_on_normal_path));
+                queue.push_back((id, next_engine, next_is_on_normal_path, depth + 1));
 
                 id
             };
@@ -166,6 +189,7 @@ pub fn generate_state_space(input: &str) -> Result<StateSpace, ReductionError> {
     Ok(StateSpace {
         nodes: states,
         edges,
+        truncated,
     })
 }
 
@@ -211,5 +235,14 @@ mod tests {
         let space = generate_state_space("I I I").unwrap();
         assert_eq!(space.nodes.len(), 3);
         assert_eq!(space.edges.len(), 2);
+        assert!(!space.truncated);
+    }
+
+    #[test]
+    fn test_generate_state_space_truncation() {
+        // Small limit to verify truncation flag
+        let space = generate_state_space_bounded("+ (+ 1 2) (+ 3 4)", 3, 50).unwrap();
+        assert_eq!(space.nodes.len(), 3);
+        assert!(space.truncated);
     }
 }

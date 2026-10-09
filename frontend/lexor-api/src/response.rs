@@ -41,4 +41,5 @@ pub struct ApiStateEdge {
 pub struct ApiStateSpace {
     pub nodes: Vec<ApiStateNode>,
     pub edges: Vec<ApiStateEdge>,
+    pub truncated: bool,
 }

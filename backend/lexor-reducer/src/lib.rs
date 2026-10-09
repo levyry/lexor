@@ -14,4 +14,7 @@ pub use tokenize::{ArgIndex, EngineToken, NodeRole};
 pub use graphred::{ReductionError as SkiReductionError, ReductionStrategy as SkiReductionStrat};
 pub use lambda::{LambdaEvalError, evaluate_lambda};
 pub use lexor_core::de_bruijn::LambdaReductionStrategy;
-pub use statespace::{StateSpace, generate_state_space};
+pub use statespace::{
+    DEFAULT_MAX_DEPTH, DEFAULT_MAX_NODES, StateSpace, generate_state_space,
+    generate_state_space_bounded,
+};

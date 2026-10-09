@@ -460,6 +460,13 @@ export const PathsGraphPanel = ({ sourceId, panelId: initialPanelId }: { sourceI
             <div className="flex-1 w-full relative min-h-[1px]">
                 <div ref={containerRef} style={{ width: '100%', height: '100%', visibility: source.stateSpace ? 'visible' : 'hidden' }} />
 
+                {source?.stateSpace?.truncated && (
+                    <div className="absolute top-3 left-1/2 -translate-x-1/2 z-10 flex items-center gap-1.5 text-xs bg-[#332b00]/95 border border-[#f59e0b] text-[#fef08a] px-3 py-1.5 rounded shadow-lg select-none whitespace-nowrap">
+                        <Codicon name="warning" className="text-[#f59e0b]" />
+                        <span>State space exceeded limit ({source.stateSpace.nodes?.length ?? 1000} nodes) and was truncated</span>
+                    </div>
+                )}
+
                 {source?.stateSpace && showNormalOrder && (
                     <div className="absolute bottom-3 left-3 z-10 flex items-center gap-2 text-xs font-mono bg-[#1e1e1e]/90 border border-[#333] px-2.5 py-1.5 rounded shadow pointer-events-none select-none">
                         <div className="w-4 h-0.5 bg-[#ef4444]"></div>

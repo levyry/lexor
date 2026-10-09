@@ -1,4 +1,4 @@
-use std::collections::{HashMap, VecDeque};
+use std::collections::{HashMap, HashSet, VecDeque};
 
 use crate::engineview::EngineView;
 use crate::tokenize::EngineToken;
@@ -95,6 +95,7 @@ pub fn generate_state_space(input: &str) -> Result<StateSpace, ReductionError> {
 
     let mut states = Vec::new();
     let mut edges = Vec::new();
+    let mut edge_set = HashSet::new();
     let mut state_map: HashMap<String, usize> = HashMap::new();
     let mut queue = VecDeque::new();
 
@@ -146,10 +147,7 @@ pub fn generate_state_space(input: &str) -> Result<StateSpace, ReductionError> {
             };
 
             // Avoid duplicate edges
-            if !edges
-                .iter()
-                .any(|e: &StateEdge| e.from == state_id && e.to == next_id)
-            {
+            if edge_set.insert((state_id, next_id)) {
                 // We recreate the exact spine for the transition to tokenize it
                 let mut transition_engine = engine.clone();
                 transition_engine.spine = spine;

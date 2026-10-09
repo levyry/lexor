@@ -21,6 +21,8 @@ export const PathsGraphPanel = ({ sourceId, panelId: initialPanelId }: { sourceI
     const [enableHighlighting, setEnableHighlighting] = useState(true);
     const [isSettingsOpen, setIsSettingsOpen] = useState(false);
     const [expansionMode, setExpansionMode] = useState<'none' | 'normal' | 'all'>('none');
+    const [rankSep, setRankSep] = useState(180);
+    const [currentZoom, setCurrentZoom] = useState(1);
     const [nodePos, setNodePos] = useState({ x: -1000, y: -1000 });
     const [_, setMousePos] = useState({ x: 0, y: 0 });
 
@@ -30,6 +32,8 @@ export const PathsGraphPanel = ({ sourceId, panelId: initialPanelId }: { sourceI
     const headRef = useRef<HTMLElement>(null);
     const idleWidthRef = useRef<number>(0);
     const idleHeadOffsetsRef = useRef<Map<number, number>>(new Map());
+    const lastStateSpaceRef = useRef<any>(null);
+    const lastRankSepRef = useRef<number>(180);
 
     const activeEdgeId = hoveredOverlayEdgeId || hoveredCytoEdgeId;
 
@@ -183,6 +187,95 @@ export const PathsGraphPanel = ({ sourceId, panelId: initialPanelId }: { sourceI
         ] as cytoscape.StylesheetStyle[];
     }, [showNormalOrder]);
 
+    const applyInitialViewport = (cy: cytoscape.Core) => {
+        cy.fit(undefined, 50);
+        const fitZoom = cy.zoom();
+        if (fitZoom < 0.6) {
+            // Large/wide graph: fitting the whole graph squashes it to an illegible strip.
+            // Center on initial root node at a comfortable, readable zoom level.
+            const root = cy.getElementById('n0');
+            if (root.length > 0) {
+                const targetZoom = 0.75;
+                cy.zoom(targetZoom);
+                const rootPos = root.position();
+                cy.pan({
+                    x: cy.width() / 2 - rootPos.x * targetZoom,
+                    y: Math.min(100, cy.height() * 0.15) - rootPos.y * targetZoom
+                });
+            }
+        } else if (fitZoom > 1.2) {
+            // Small graph: clamp max zoom so 2-3 nodes don't look giant.
+            cy.zoom(1.2);
+            cy.center();
+        }
+        updateOverlayPos();
+        setCurrentZoom(cy.zoom());
+    };
+
+    const handleZoomIn = () => {
+        if (!cyRef.current) return;
+        const cy = cyRef.current;
+        const newZoom = Math.min(4.0, cy.zoom() * 1.3);
+        cy.zoom({
+            level: newZoom,
+            renderedPosition: { x: cy.width() / 2, y: cy.height() / 2 }
+        });
+        updateOverlayPos();
+        setCurrentZoom(newZoom);
+    };
+
+    const handleZoomOut = () => {
+        if (!cyRef.current) return;
+        const cy = cyRef.current;
+        const newZoom = Math.max(0.05, cy.zoom() / 1.3);
+        cy.zoom({
+            level: newZoom,
+            renderedPosition: { x: cy.width() / 2, y: cy.height() / 2 }
+        });
+        updateOverlayPos();
+        setCurrentZoom(newZoom);
+    };
+
+    const handleResetZoom = () => {
+        if (!cyRef.current) return;
+        const cy = cyRef.current;
+        cy.zoom({
+            level: 1.0,
+            renderedPosition: { x: cy.width() / 2, y: cy.height() / 2 }
+        });
+        updateOverlayPos();
+        setCurrentZoom(1.0);
+    };
+
+    const handleFitView = () => {
+        if (!cyRef.current) return;
+        const cy = cyRef.current;
+        cy.fit(undefined, 50);
+        updateOverlayPos();
+        setCurrentZoom(cy.zoom());
+    };
+
+    const handleFocusRoot = () => {
+        if (!cyRef.current) return;
+        const cy = cyRef.current;
+        const root = cy.getElementById('n0');
+        if (root.length > 0) {
+            const targetZoom = 0.75;
+            cy.zoom(targetZoom);
+            const rootPos = root.position();
+            cy.pan({
+                x: cy.width() / 2 - rootPos.x * targetZoom,
+                y: Math.min(100, cy.height() * 0.15) - rootPos.y * targetZoom
+            });
+            updateOverlayPos();
+            setCurrentZoom(targetZoom);
+        } else {
+            cy.fit(undefined, 50);
+            updateOverlayPos();
+            setCurrentZoom(cy.zoom());
+        }
+    };
+
     useEffect(() => {
         if (!containerRef.current) return;
 
@@ -190,11 +283,16 @@ export const PathsGraphPanel = ({ sourceId, panelId: initialPanelId }: { sourceI
             container: containerRef.current,
             style: customStylesheet,
             elements: [],
-            wheelSensitivity: 0.2,
+            minZoom: 0.05,
+            maxZoom: 4.0,
+            autoungrabify: true,
         });
         cyRef.current = cy;
 
-        cy.on('pan zoom position', updateOverlayPos);
+        cy.on('pan zoom position', () => {
+            updateOverlayPos();
+            setCurrentZoom(cy.zoom());
+        });
 
         cy.on('mouseover', 'edge', (event) => {
             setHoveredCytoEdgeId(event.target.id());
@@ -212,10 +310,17 @@ export const PathsGraphPanel = ({ sourceId, panelId: initialPanelId }: { sourceI
             setSelectedNodeId(parseInt(event.target.id().replace('n', ''), 10));
         });
 
-        const observer = new ResizeObserver(() => {
-            cy.resize();
-            cy.fit(undefined, 50);
-            updateOverlayPos();
+        let hasInitializedViewport = false;
+        const observer = new ResizeObserver(([entry]) => {
+            if (!cyRef.current) return;
+            const currentCy = cyRef.current;
+            currentCy.resize();
+            if (!hasInitializedViewport && entry.contentRect.width > 0 && entry.contentRect.height > 0) {
+                hasInitializedViewport = true;
+                applyInitialViewport(currentCy);
+            } else {
+                updateOverlayPos();
+            }
         });
         observer.observe(containerRef.current);
 
@@ -234,6 +339,14 @@ export const PathsGraphPanel = ({ sourceId, panelId: initialPanelId }: { sourceI
         if (!cyRef.current || elements.length === 0) return;
         const cy = cyRef.current;
 
+        const isNewStateSpace = lastStateSpaceRef.current !== source?.stateSpace;
+        const rankSepChanged = lastRankSepRef.current !== rankSep;
+        lastStateSpaceRef.current = source?.stateSpace;
+        lastRankSepRef.current = rankSep;
+
+        const prevZoom = cy.zoom();
+        const prevPan = { ...cy.pan() };
+
         cy.elements().remove();
         cy.add(elements);
 
@@ -243,14 +356,20 @@ export const PathsGraphPanel = ({ sourceId, panelId: initialPanelId }: { sourceI
             ranker: 'tight-tree',
             nodeSep: 50,
             edgeSep: 40,
-            rankSep: 60,
+            rankSep: rankSep,
             animate: false,
             stop: () => {
-                cy.fit(undefined, 50);
-                updateOverlayPos();
+                if (isNewStateSpace) {
+                    applyInitialViewport(cy);
+                } else if (rankSepChanged) {
+                    updateOverlayPos();
+                } else {
+                    cy.viewport({ zoom: prevZoom, pan: prevPan });
+                    updateOverlayPos();
+                }
             }
         } as any).run();
-    }, [elements]);
+    }, [elements, rankSep]);
 
     useEffect(() => {
         if (!cyRef.current) return;
@@ -462,13 +581,40 @@ export const PathsGraphPanel = ({ sourceId, panelId: initialPanelId }: { sourceI
                                 />
                                 Expand All Nodes
                             </label>
+
+                            <div className="h-px bg-[#333] my-1" />
+
+                            <div className="flex flex-col gap-1.5">
+                                <div className="flex items-center justify-between text-xs">
+                                    <span className="text-gray-500 uppercase font-bold tracking-wider">Vertical Spacing</span>
+                                    <span className="text-gray-400 font-mono">{rankSep}px</span>
+                                </div>
+                                <input
+                                    type="range"
+                                    min="80"
+                                    max="300"
+                                    step="20"
+                                    value={rankSep}
+                                    onChange={e => setRankSep(parseInt(e.currentTarget.value, 10))}
+                                    className="w-full cursor-pointer accent-blue-500 h-1.5 bg-[#444] rounded-lg appearance-none"
+                                />
+                                <div className="flex justify-between text-[10px] text-gray-500 font-mono select-none">
+                                    <span>80px</span>
+                                    <span>180px</span>
+                                    <span>300px</span>
+                                </div>
+                            </div>
                         </div>
                     )}
                 </div>
             </div>
 
             <div className="flex-1 w-full relative min-h-[1px]">
-                <div ref={containerRef} style={{ width: '100%', height: '100%', visibility: source.stateSpace ? 'visible' : 'hidden' }} />
+                <div
+                    ref={containerRef}
+                    className="w-full h-full cursor-grab active:cursor-grabbing"
+                    style={{ visibility: source.stateSpace ? 'visible' : 'hidden' }}
+                />
 
                 {source?.stateSpace?.truncated && (
                     <div className="absolute top-3 left-1/2 -translate-x-1/2 z-10 flex items-center gap-1.5 text-xs bg-[#332b00]/95 border border-[#f59e0b] text-[#fef08a] px-3 py-1.5 rounded shadow-lg select-none whitespace-nowrap">
@@ -481,6 +627,46 @@ export const PathsGraphPanel = ({ sourceId, panelId: initialPanelId }: { sourceI
                     <div className="absolute bottom-3 left-3 z-10 flex items-center gap-2 text-xs font-mono bg-[#1e1e1e]/90 border border-[#333] px-2.5 py-1.5 rounded shadow pointer-events-none select-none">
                         <div className="w-4 h-0.5 bg-[#ef4444]"></div>
                         <span className="text-gray-400">Normal Order Path</span>
+                    </div>
+                )}
+
+                {source?.stateSpace && (
+                    <div className="absolute bottom-3 right-3 z-10 flex items-center bg-[#252526]/90 border border-[#444] rounded shadow-lg backdrop-blur-sm overflow-hidden text-gray-300 select-none">
+                        <button
+                            onClick={handleZoomIn}
+                            className="p-1.5 hover:bg-[#333] hover:text-white transition-colors cursor-pointer border-r border-[#444]"
+                            title="Zoom In"
+                        >
+                            <Codicon name="zoom-in" className="text-sm block" />
+                        </button>
+                        <button
+                            onClick={handleResetZoom}
+                            className="px-2 py-1 text-xs font-mono text-gray-400 hover:text-white hover:bg-[#333] transition-colors cursor-pointer border-r border-[#444] min-w-[44px] text-center"
+                            title="Reset Zoom to 100%"
+                        >
+                            {Math.round(currentZoom * 100)}%
+                        </button>
+                        <button
+                            onClick={handleZoomOut}
+                            className="p-1.5 hover:bg-[#333] hover:text-white transition-colors cursor-pointer border-r border-[#444]"
+                            title="Zoom Out"
+                        >
+                            <Codicon name="zoom-out" className="text-sm block" />
+                        </button>
+                        <button
+                            onClick={handleFitView}
+                            className="p-1.5 hover:bg-[#333] hover:text-white transition-colors cursor-pointer border-r border-[#444]"
+                            title="Fit Entire Graph"
+                        >
+                            <Codicon name="screen-full" className="text-sm block" />
+                        </button>
+                        <button
+                            onClick={handleFocusRoot}
+                            className="p-1.5 hover:bg-[#333] hover:text-white transition-colors cursor-pointer"
+                            title="Focus Initial Node (Step 0)"
+                        >
+                            <Codicon name="target" className="text-sm block" />
+                        </button>
                     </div>
                 )}
 

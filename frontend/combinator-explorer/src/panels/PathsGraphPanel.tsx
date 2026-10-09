@@ -115,9 +115,9 @@ export const PathsGraphPanel = ({ sourceId, panelId: initialPanelId }: { sourceI
                     textColor,
                     opacity,
                     nodeShape: isExpanded ? 'round-rectangle' : 'ellipse',
-                    width: isExpanded ? 'label' : '12px',
-                    height: isExpanded ? 'label' : '12px',
-                    padding: isExpanded ? '10px' : '0px',
+                    width: isExpanded ? `${Math.max(40, n.expression.length * 9.5 + 20)}px` : '12px',
+                    height: isExpanded ? '30px' : '12px',
+                    padding: isExpanded ? '6px' : '0px',
                 }
             };
         });
@@ -240,9 +240,9 @@ export const PathsGraphPanel = ({ sourceId, panelId: initialPanelId }: { sourceI
         cy.layout({
             name: 'dagre',
             rankDir: 'TB',
-            ranker: 'network-simplex',
-            nodeSep: 60,
-            edgeSep: 60,
+            ranker: 'tight-tree',
+            nodeSep: 50,
+            edgeSep: 40,
             rankSep: 60,
             animate: false,
             stop: () => {
@@ -473,7 +473,7 @@ export const PathsGraphPanel = ({ sourceId, panelId: initialPanelId }: { sourceI
                 {source?.stateSpace?.truncated && (
                     <div className="absolute top-3 left-1/2 -translate-x-1/2 z-10 flex items-center gap-1.5 text-xs bg-[#332b00]/95 border border-[#f59e0b] text-[#fef08a] px-3 py-1.5 rounded shadow-lg select-none whitespace-nowrap">
                         <Codicon name="warning" className="text-[#f59e0b]" />
-                        <span>State space exceeded limit ({source.stateSpace.nodes?.length ?? 1000} nodes) and was truncated</span>
+                        <span>State space exceeded limit ({source.stateSpace.nodes?.length ?? 150} nodes) and was truncated</span>
                     </div>
                 )}
 

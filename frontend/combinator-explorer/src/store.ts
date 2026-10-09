@@ -150,4 +150,34 @@ export const useStore = create<AppState>()(persist((set, get) => ({
             get().updateSource(id, { error: String(e), isGeneratingStateSpace: false });
         }
     }
-}), { name: 'lexor-state-storage' }));
+}), {
+    name: 'lexor-state-storage',
+    partialize: (state) => ({
+        sources: Object.fromEntries(
+            Object.entries(state.sources).map(([id, s]) => [
+                id,
+                {
+                    id: s.id,
+                    kind: s.kind,
+                    skiInput: s.skiInput,
+                    lambdaInput: s.lambdaInput,
+                    skiStrategy: s.skiStrategy,
+                    lambdaStrategy: s.lambdaStrategy,
+                    fontSize: s.fontSize,
+                    nodeSharing: s.nodeSharing,
+                    desugarChurch: s.desugarChurch,
+                    reductionSteps: s.reductionSteps?.slice(0, 50) || [],
+                    graphHistory: [],
+                    convertedLambda: s.convertedLambda,
+                    stateSpace: null,
+                    selectedNodeId: 0,
+                    error: null,
+                    isGeneratingStateSpace: false,
+                }
+            ])
+        ),
+        graphSteps: state.graphSteps,
+        activeGraphBySource: state.activeGraphBySource,
+        globalActiveGraph: state.globalActiveGraph,
+    }),
+}));

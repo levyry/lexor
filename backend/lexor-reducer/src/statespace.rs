@@ -34,7 +34,7 @@ pub struct StateSpace {
     pub truncated: bool,
 }
 
-pub const DEFAULT_MAX_NODES: usize = 1000;
+pub const DEFAULT_MAX_NODES: usize = 150;
 pub const DEFAULT_MAX_DEPTH: usize = 50;
 
 pub struct RedexVisitor<'a> {

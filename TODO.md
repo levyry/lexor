@@ -2,10 +2,12 @@
 
 ## TODO
 
-- write a pretty todo for main project
+- write a pretty readme for main project
 - try out and benchmark cranelift backend
 - search whole project for "TODO" strings and clean them up
-- add docker support for building
+- edu module: problems from smullyan book, around 20-30 and a few numeral ones
+- lambda module: gut it, move input part to conversion panel
+- also include naive conversion for comparison
 
 ## Resources
 

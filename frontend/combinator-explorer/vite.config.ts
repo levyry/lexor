@@ -5,6 +5,16 @@ import tailwindcss from '@tailwindcss/vite';
 import { VitePWA } from 'vite-plugin-pwa';
 
 export default defineConfig({
+	base: "/",
+	preview: {
+		port: 5173,
+		strictPort: true,
+	},
+	server: {
+		port: 5173,
+		strictPort: true,
+		host: true,
+	},
 	plugins: [
 		preact(),
 		wasm(),
@@ -39,5 +49,5 @@ export default defineConfig({
 	],
 	build: {
 		target: 'esnext'
-	}
+	},
 });
